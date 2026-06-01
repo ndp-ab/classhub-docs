@@ -135,6 +135,14 @@ Refactor riêng `HomeScreen` thành class selector screen sau đăng nhập. Mà
 
 **Kiểm tra:** `flutter analyze lib/screens/home_screen.dart` → passed. `flutter analyze` toàn project → passed.
 
+## Giai đoạn 8.2 — Điều chỉnh ClassroomDetailScreen workspace (2026-06-01)
+
+Điều chỉnh layout `ClassroomDetailScreen`: `_DashboardHeader` vẫn dùng chung toàn bộ tab, còn identity card lớp và 3 stat cards chỉ hiển thị trong tab Tổng quan. Các tab Quỹ/Sự kiện/Thành viên tập trung vào nội dung chính, không lặp lại card thông tin lớp.
+
+**Phạm vi:** Chỉ refactor layout UI trong `lib/screens/classroom_detail_screen.dart`; không đổi service/model/provider/API hoặc logic của `FundTab`, `ExpensesScreen`, `EventsTab`.
+
+**Kiểm tra:** `flutter analyze` → passed.
+
 ## Giai đoạn 7 — Bổ sung trước demo (kế hoạch)
 
 | Việc | Ưu tiên | Effort |
@@ -160,6 +168,7 @@ Tuần 5-6:        Frontend core
 Tuần 7:          Polish UX + Documentation
 2026-05-22→23:   Design system rollout + fix freeze CPS
 2026-05-31:      Refactor HomeScreen thành class selector
+2026-06-01:      Điều chỉnh ClassroomDetailScreen workspace
 Trước demo:      API members + statistics + smoke test
 ```
 

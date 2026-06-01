@@ -84,7 +84,7 @@ Tổng **13 màn hình** chia 3 nhóm:
 ### 9.4.3. Chi tiết lớp + 3 phân hệ (8 màn)
 | File | Mô tả |
 |---|---|
-| `screens/classroom_detail_screen.dart` | `DefaultTabController` với 4 tab: Tổng quan, Khoản thu, Khoản chi, Sự kiện. |
+| `screens/classroom_detail_screen.dart` | Workspace theo lớp với header compact dùng chung, bottom navigation: Tổng quan, Quỹ, Sự kiện, Thành viên. Identity card lớp + stat cards chỉ hiển thị trong tab Tổng quan. |
 | `screens/fund/fund_tab.dart` | Tab "Khoản thu". Member thấy section "Khoản của bạn" + nút "Xem QR". Admin thấy FAB tạo đợt thu, tap card → chi tiết payments. |
 | `screens/fund/payment_qr_screen.dart` | Hiển thị QR (Image.network), nội dung CK + nút Copy. Polling status 5s/lần qua `Timer.periodic`. Dispose timer khi pop. |
 | `screens/fund/collection_payments_screen.dart` | Admin xem ai đã/chưa đóng. Nút "Xác nhận" có confirm dialog. |
@@ -274,6 +274,12 @@ Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace se
 - Quick actions dùng shared button: `Tạo lớp` và `Nhập mã lớp`.
 - Section `Lớp học của bạn` hiển thị danh sách classroom cards.
 - Mỗi card dùng `AppCard`, hiển thị className, faculty/academicYear, role badge Admin/Member, invite code và chevron để thể hiện có thể bấm.
+
+### ClassroomDetailScreen workspace
+`ClassroomDetailScreen` là workspace theo lớp sau khi chọn lớp:
+- `_DashboardHeader` là header compact dùng chung cho toàn bộ tab.
+- Identity card lớp và 3 stat cards chỉ nằm trong tab Tổng quan.
+- Các tab Quỹ/Sự kiện/Thành viên tập trung vào nội dung chính, không lặp lại card thông tin lớp.
 
 ### Confirm dialog
 2 action không hoàn tác có confirm:

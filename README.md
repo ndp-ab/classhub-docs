@@ -75,6 +75,7 @@
 - ✅ Bảo mật + Audit trail (sau B1–B8)
 - ✅ Manual test E2E qua demo script
 - ✅ Design system FE (theme tokens + 9 shared widgets) + refactor 13 màn
+- ✅ HomeScreen class selector + ClassroomDetailScreen workspace layout
 - ✅ Fix bug freeze CollectionPaymentsScreen trên Chrome Web (Tier 4 refactor)
 
 ### Còn lại trước demo
