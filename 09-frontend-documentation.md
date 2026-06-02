@@ -166,17 +166,16 @@ Role được gom ở `lib/core/constants/user_roles.dart`:
 ```dart
 class UserRoles {
   static const String admin = 'ADMIN';
-  static const String owner = 'OWNER';
   static const String member = 'MEMBER';
 
-  static bool isAdminLike(String? role) => role == admin || role == owner;
+  static bool isAdminLike(String? role) => role == admin;
   static bool isMember(String? role) => role == member;
 }
 ```
 
 `HomeScreen` và `ClassroomDetailScreen` không check trực tiếp `role == 'ADMIN'`
-nữa, mà dùng `UserRoles.isAdminLike(...)`. Điều này giữ behavior hiện tại với
-`ADMIN`, đồng thời nếu BE sau này trả thêm `OWNER` thì FE xem như quyền admin.
+nữa, mà dùng `UserRoles.isAdminLike(...)`. Backend hiện chỉ có `ADMIN`/`MEMBER`;
+`OWNER` chưa nằm trong code FE/BE hiện tại và chỉ được ghi nhận như hướng mở rộng.
 
 ## 9.7. Model
 

@@ -150,13 +150,15 @@ màn tự check string khác nhau.
 
 | Việc | Trạng thái |
 |---|---|
-| Thêm `UserRoles.admin`, `UserRoles.owner`, `UserRoles.member` | ✅ |
-| Thêm `UserRoles.isAdminLike(role)` cho quyền admin/owner | ✅ |
+| Thêm `UserRoles.admin`, `UserRoles.member` | ✅ |
+| Thêm `UserRoles.isAdminLike(role)` cho quyền admin | ✅ |
 | `HomeScreen` dùng `UserRoles.isAdminLike(...)` thay vì `role == 'ADMIN'` | ✅ |
-| `ClassroomDetailScreen` dùng `UserRoles.isAdminLike(...)` thay vì `role == 'ADMIN' || role == 'OWNER'` | ✅ |
+| `ClassroomDetailScreen` dùng `UserRoles.isAdminLike(...)` thay vì check role string trực tiếp | ✅ |
 
 **Phạm vi:** Chỉ đổi logic role ở FE; không đổi service/API, payment status,
 polling hoặc UI layout.
+
+**Ghi chú:** `OWNER` chưa có trong BE/FE hiện tại, chỉ là hướng mở rộng sau này.
 
 **Kiểm tra:** `flutter analyze` → passed.
 
