@@ -143,6 +143,23 @@ Refactor riêng `HomeScreen` thành class selector screen sau đăng nhập. Mà
 
 **Kiểm tra:** `flutter analyze` → passed.
 
+## Giai đoạn 8.3 — Centralize role checks FE (2026-06-03)
+
+Gom logic role ở frontend vào `lib/core/constants/user_roles.dart` để tránh mỗi
+màn tự check string khác nhau.
+
+| Việc | Trạng thái |
+|---|---|
+| Thêm `UserRoles.admin`, `UserRoles.owner`, `UserRoles.member` | ✅ |
+| Thêm `UserRoles.isAdminLike(role)` cho quyền admin/owner | ✅ |
+| `HomeScreen` dùng `UserRoles.isAdminLike(...)` thay vì `role == 'ADMIN'` | ✅ |
+| `ClassroomDetailScreen` dùng `UserRoles.isAdminLike(...)` thay vì `role == 'ADMIN' || role == 'OWNER'` | ✅ |
+
+**Phạm vi:** Chỉ đổi logic role ở FE; không đổi service/API, payment status,
+polling hoặc UI layout.
+
+**Kiểm tra:** `flutter analyze` → passed.
+
 ## Giai đoạn 7 — Bổ sung trước demo (kế hoạch)
 
 | Việc | Ưu tiên | Effort |
@@ -190,6 +207,6 @@ Trước demo:      API members + statistics + smoke test
 
 1. **Audit sớm hơn**: Nếu audit theo checklist từ tuần 4 thay vì tuần 6 thì không phải refactor nhiều ở B1+B2.
 2. **Test sớm hơn**: Manual test với Postman từng phân hệ ngay sau khi viết — không phải để tới khi tích hợp FE mới phát hiện bug.
-3. **Lưu thông tin về quyết định thiết kế**: Tại sao chọn Provider thay Bloc, tại sao không có OWNER role... Để trả lời hội đồng dễ.
+3. **Lưu thông tin về quyết định thiết kế**: Tại sao chọn Provider thay Bloc, tại sao backend hiện chưa có OWNER role... Để trả lời hội đồng dễ.
 4. **Hibernate `ddl-auto=update`** rất tiện nhưng phải backup DB trước khi đổi entity quan trọng.
 5. **Confirm dialog** cho action destructive đáng làm — chỉ 10 dòng code nhưng chống lỗi UX rõ rệt.

@@ -165,7 +165,7 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 | "Sinh viên join lớp sau khi đã có khoản thu thì sao?" | "Có. `joinClassroom` query mọi collection của lớp + sinh payment bổ sung cho user mới. Đã test." |
 | "Confirm thanh toán 2 lần thì sao?" | "Backend chặn idempotent — trả 400 'đã được xác nhận'. Frontend cũng có confirm dialog." |
 | "Có test case chưa?" | "Có 28 test case đặc tả ở `10-kiem-thu.md`, đã chạy manual qua Postman. Test tự động JUnit + MockMvc đưa vào giai đoạn tiếp theo." |
-| "Hạn chế hiện tại?" | "(1) Chưa có tab Thành viên — chờ API BE. (2) Chưa có dashboard thống kê quỹ. (3) Role chỉ 2 cấp ADMIN/MEMBER, chưa có OWNER. (4) Đối soát ngân hàng thủ công. Tất cả ở mục Hướng phát triển." |
+| "Hạn chế hiện tại?" | "(1) Chưa có tab Thành viên — chờ API BE. (2) Chưa có dashboard thống kê quỹ. (3) Backend hiện vẫn 2 cấp ADMIN/MEMBER; frontend đã gom helper `UserRoles.isAdminLike` để sẵn sàng coi OWNER như quyền admin nếu BE mở rộng. (4) Đối soát ngân hàng thủ công. Tất cả ở mục Hướng phát triển." |
 
 ## Lỗi có thể gặp khi demo + Cách xử lý
 

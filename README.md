@@ -90,7 +90,7 @@
 - 🟡 Postman collection export
 
 ### Hướng phát triển (đưa vào báo cáo)
-- Role OWNER (3 cấp)
+- Role OWNER ở backend (frontend đã gom `UserRoles.isAdminLike` để hỗ trợ sẵn)
 - Push notification (FCM)
 - Đối soát ngân hàng tự động (webhook VietQR)
 - iOS support

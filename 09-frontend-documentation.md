@@ -19,6 +19,7 @@ classhub_app/
 │   │   │                                  AppEmptyState, AppErrorState,
 │   │   │                                  AppLoading, PaymentStatusBadge
 │   │   ├── config/                     — AppConfig, API base URL
+│   │   ├── constants/                  — UserRoles, role helpers
 │   │   └── utils/                      — formatVnd, formatDate,
 │   │                                      formatDateTime
 │   ├── models/                         — Data class parse JSON
@@ -157,6 +158,25 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
   {success: false, message: "..."}
   ```
 - Try/catch quanh `http.xxx` để bắt lỗi network.
+
+### Role helper FE
+
+Role được gom ở `lib/core/constants/user_roles.dart`:
+
+```dart
+class UserRoles {
+  static const String admin = 'ADMIN';
+  static const String owner = 'OWNER';
+  static const String member = 'MEMBER';
+
+  static bool isAdminLike(String? role) => role == admin || role == owner;
+  static bool isMember(String? role) => role == member;
+}
+```
+
+`HomeScreen` và `ClassroomDetailScreen` không check trực tiếp `role == 'ADMIN'`
+nữa, mà dùng `UserRoles.isAdminLike(...)`. Điều này giữ behavior hiện tại với
+`ADMIN`, đồng thời nếu BE sau này trả thêm `OWNER` thì FE xem như quyền admin.
 
 ## 9.7. Model
 
