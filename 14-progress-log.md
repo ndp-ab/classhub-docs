@@ -51,7 +51,7 @@
 | Models có defensive parsing | ✅ |
 
 **Vấn đề gặp:**
-- Android emulator dùng `10.0.2.2` thay vì `localhost` — phải hardcode `baseUrl` đổi tuỳ thiết bị.
+- Android emulator dùng `10.0.2.2` thay vì `localhost`; FE hiện dùng `AppConfig.baseUrl` và override bằng `--dart-define=API_BASE_URL=...`.
 - Lombok+Jackson serialize boolean field tên `isPaid` thành `paid` — phải parse defensive cả 2 key.
 - Polling Timer phải nhớ `dispose()` khi pop màn để tránh memory leak.
 

@@ -7,7 +7,7 @@
 | Manual test (Postman + Flutter) | ✅ Đã làm theo demo script | Xem `12-demo-script.md` |
 | Test case TC01–TC20 đặc tả | ✅ Đã liệt kê dưới | |
 | Test case tự động (JUnit + MockMvc) | 🟡 Chưa implement | Sẽ làm trong giai đoạn tiếp theo |
-| Test trên thiết bị thật | ⚠️ Cần test trước demo | Đổi `baseUrl` → IP LAN |
+| Test trên thiết bị thật | ⚠️ Cần test trước demo | Chạy FE với `--dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
 
 ## 10.2. Bảng test case TC01–TC20
 

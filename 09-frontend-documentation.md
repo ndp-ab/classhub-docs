@@ -18,6 +18,7 @@ classhub_app/
 │   │   │                                  AppPickerField, AppSectionTitle,
 │   │   │                                  AppEmptyState, AppErrorState,
 │   │   │                                  AppLoading, PaymentStatusBadge
+│   │   ├── config/                     — AppConfig, API base URL
 │   │   └── utils/                      — formatVnd, formatDate,
 │   │                                      formatDateTime
 │   ├── models/                         — Data class parse JSON
@@ -120,6 +121,9 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 ## 9.6. Service
 
 4 service:
+
+`baseUrl` không hard-code trong từng service. Cả 4 service dùng chung
+`AppConfig.baseUrl` từ `lib/core/config/app_config.dart`.
 
 ### `services/auth_service.dart`
 - `register(fullName, email, password)` → `POST /api/auth/register`
@@ -315,15 +319,38 @@ dev_dependencies:
 
 ## 9.15. baseUrl theo môi trường
 
-`baseUrl` được hardcode trong 4 service file. Phải đổi tay:
+`baseUrl` được quản lý tập trung tại:
 
-| Thiết bị | baseUrl |
+```txt
+lib/core/config/app_config.dart
+```
+
+Nội dung cấu hình:
+
+```dart
+class AppConfig {
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8080/api',
+  );
+}
+```
+
+Mặc định là `http://localhost:8080/api`. Không sửa tay trong
+`auth_service.dart`, `classroom_service.dart`, `fund_service.dart`,
+`event_service.dart`.
+
+| Thiết bị | Cách chạy |
 |---|---|
-| Chrome web / Desktop | `http://localhost:8080/api` |
-| Android emulator | `http://10.0.2.2:8080/api` |
-| Device thật (cùng WiFi) | `http://<IP-máy-tính>:8080/api` (vd `192.168.1.5`) |
+| Chrome web / Desktop | `flutter run` |
+| Android emulator | `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api` |
+| Device thật (cùng WiFi) | `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
 
-→ Hướng phát triển: tách thành file `config.dart` hoặc đọc từ `.env`.
+Build APK demo:
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
+```
 
 ## 9.16. Limitation hiện tại
 
@@ -344,4 +371,4 @@ $ flutter pub get
 $ flutter build apk --debug
 ```
 
-→ Build thành công. Test trên thiết bị thật cần đổi `baseUrl`.
+→ Build thành công. Test trên thiết bị thật cần truyền `API_BASE_URL` bằng `--dart-define`.

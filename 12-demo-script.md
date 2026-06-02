@@ -8,7 +8,7 @@
 ✅ Trước khi vào phòng demo:
 1. MySQL đã chạy, BE đã `./mvnw spring-boot:run`, console không lỗi.
 2. 2 thiết bị (laptop + điện thoại) hoặc 2 emulator để mô phỏng Admin + Member.
-3. Cấu hình `baseUrl` cho cả 2 thiết bị (xem mục 11.4.2).
+3. Cấu hình `baseUrl` cho cả 2 thiết bị bằng `--dart-define=API_BASE_URL=...` (xem mục 11.4.2).
 4. Đã đăng ký sẵn **3 tài khoản test** (xem `13-tai-khoan-test.md`):
    - `admin@demo.com` — sẽ là Admin.
    - `sv1@demo.com` — Member.

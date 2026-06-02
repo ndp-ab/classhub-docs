@@ -125,21 +125,27 @@ flutter pub get
 
 ### 11.4.2. Cấu hình `baseUrl`
 
-Sửa 4 file (`lib/services/auth_service.dart`, `classroom_service.dart`, `fund_service.dart`, `event_service.dart`).
+`baseUrl` được quản lý tập trung trong FE tại:
 
-Tìm dòng:
-```dart
-static const String baseUrl = 'http://localhost:8080/api';
+```txt
+lib/core/config/app_config.dart
 ```
 
-Đổi tuỳ thiết bị:
+Mặc định là `http://localhost:8080/api`. Khi cần chạy trên môi trường khác,
+truyền `API_BASE_URL` bằng `--dart-define`, không sửa tay từng service.
 
-| Thiết bị | baseUrl đúng |
+| Thiết bị | Cách chạy |
 |---|---|
-| Chrome web | `http://localhost:8080/api` |
-| Windows desktop | `http://localhost:8080/api` |
-| Android emulator | `http://10.0.2.2:8080/api` |
-| Thiết bị Android thật (cùng WiFi) | `http://<IP-LAN>:8080/api` (vd `192.168.1.5`) |
+| Chrome web | `flutter run -d chrome` |
+| Windows desktop | `flutter run -d windows` |
+| Android emulator | `flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8080/api` |
+| Thiết bị Android thật (cùng WiFi) | `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
+
+Build APK demo cho thiết bị thật:
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
+```
 
 > Để biết IP LAN: chạy `ipconfig` (Windows) → tìm `IPv4 Address` ở `Wireless LAN adapter Wi-Fi`.
 
@@ -180,7 +186,7 @@ Windows Firewall mặc định chặn inbound port 8080.
 | FE: `flutter pub get` lỗi | Mạng / version conflict | `flutter clean && flutter pub get` |
 | FE: app không kết nối được BE | baseUrl sai cho thiết bị | Xem mục 11.4.2 |
 | FE: 401 dù vừa login | JWT secret BE thay đổi sau khi login | Logout → login lại trên FE |
-| FE Android emulator: `Connection refused` | Dùng `localhost` (sai) | Đổi thành `10.0.2.2` |
+| FE Android emulator: `Connection refused` | Dùng `localhost` (sai) | Chạy với `--dart-define=API_BASE_URL=http://10.0.2.2:8080/api` |
 | Hibernate: `Unknown column 'confirmed_by'` | Đã upgrade code B3 nhưng MySQL chưa ALTER | `ddl-auto=update` phải bật; restart BE |
 
 ## 11.7. Reset / clean data
