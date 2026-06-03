@@ -76,6 +76,7 @@
 - ✅ Manual test E2E qua demo script
 - ✅ Design system FE (theme tokens + 9 shared widgets) + refactor 13 màn
 - ✅ HomeScreen class selector + ClassroomDetailScreen workspace layout
+- ✅ Classroom switcher bottom sheet trong workspace
 - ✅ Fix bug freeze CollectionPaymentsScreen trên Chrome Web (Tier 4 refactor)
 
 ### Còn lại trước demo

@@ -36,8 +36,9 @@
 ### Bước 4 — Tạo khoản thu (1 phút)
 **Trên laptop (Admin):**
 1. Tap card lớp K64KTPM3 → vào ClassroomDetail.
-2. Sang tab "Khoản thu" → bấm FAB "Tạo đợt thu".
-3. Nhập: title = "Quỹ lớp tháng 5", amount = 50000, deadline = ngày mai → bấm Tạo.
+2. Có thể bấm tên lớp ở header để mở danh sách lớp và chuyển nhanh sang lớp khác nếu cần demo multi-class.
+3. Sang tab "Khoản thu" → bấm FAB "Tạo đợt thu".
+4. Nhập: title = "Quỹ lớp tháng 5", amount = 50000, deadline = ngày mai → bấm Tạo.
 
 > Nói: "**Khi admin tạo, hệ thống tự sinh bản ghi nợ cho cả 3 thành viên cùng lúc** — không phải tạo thủ công cho từng người."
 

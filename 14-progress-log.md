@@ -162,6 +162,22 @@ polling hoặc UI layout.
 
 **Kiểm tra:** `flutter analyze` → passed.
 
+## Giai đoạn 8.4 — Classroom switcher sheet FE (2026-06-03)
+
+Bổ sung luồng đổi lớp ngay trong `ClassroomDetailScreen` để user không phải quay
+về Home khi muốn chuyển workspace.
+
+| Việc | Trạng thái |
+|---|---|
+| Thêm `lib/screens/classroom_switcher_sheet.dart` | ✅ |
+| Bottom sheet load danh sách lớp bằng `ClassroomService.getMyClassrooms(...)` | ✅ |
+| Lớp hiện tại hiển thị `Đang chọn` + dấu check | ✅ |
+| Chọn lớp khác dùng `Navigator.pushReplacement` mở lại `ClassroomDetailScreen` | ✅ |
+
+**Phạm vi:** Chỉ đổi frontend; không thêm backend API, không sửa service API.
+
+**Kiểm tra:** `flutter analyze` → passed.
+
 ## Giai đoạn 7 — Bổ sung trước demo (kế hoạch)
 
 | Việc | Ưu tiên | Effort |
@@ -188,6 +204,7 @@ Tuần 7:          Polish UX + Documentation
 2026-05-22→23:   Design system rollout + fix freeze CPS
 2026-05-31:      Refactor HomeScreen thành class selector
 2026-06-01:      Điều chỉnh ClassroomDetailScreen workspace
+2026-06-03:      Classroom switcher sheet trong workspace
 Trước demo:      API members + statistics + smoke test
 ```
 

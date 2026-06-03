@@ -161,13 +161,25 @@ spring.jpa.hibernate.ddl-auto=create-drop
 
 Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự kiện.
 
-### 10.6.2. Test trên 2 thiết bị / emulator
+### 10.6.2. Test đổi lớp trong workspace
+Điều kiện: user đã tham gia ít nhất 2 lớp.
+
+1. Đăng nhập user có lớp A và lớp B.
+2. Vào lớp A từ `HomeScreen`.
+3. Bấm tên lớp ở header của `ClassroomDetailScreen`.
+4. Kiểm tra bottom sheet hiển thị danh sách lớp; lớp A có trạng thái `Đang chọn`.
+5. Chọn lớp B.
+6. Kiểm tra màn chuyển sang `ClassroomDetailScreen` của lớp B và tab mặc định là Tổng quan.
+7. Mở tab Quỹ/Sự kiện, kiểm tra dữ liệu dùng đúng `classroomId` lớp B.
+8. Bấm tên lớp và chọn lại lớp A, kiểm tra chuyển về đúng lớp A.
+
+### 10.6.3. Test trên 2 thiết bị / emulator
 Để demo "Admin xác nhận → Member thấy polling cập nhật" trực quan:
 - Thiết bị 1: đăng nhập Admin, mở `CollectionPaymentsScreen`.
 - Thiết bị 2: đăng nhập Member, mở `PaymentQrScreen` (đang polling).
 - Trên thiết bị 1, bấm Xác nhận → trong ≤ 5s thiết bị 2 chuyển trạng thái.
 
-### 10.6.3. Flutter widget test (chưa làm)
+### 10.6.4. Flutter widget test (chưa làm)
 Có thể viết widget test cho:
 - `LoginScreen` render đủ 2 field + nút submit.
 - `HomeScreen` hiển thị "Chưa tham gia lớp nào" khi list rỗng.

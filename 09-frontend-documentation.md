@@ -80,6 +80,7 @@ Tổng **13 màn hình** chia 3 nhóm:
 | `screens/home_screen.dart` | Class selector screen sau đăng nhập. Header ClassHub + greeting, 2 quick actions Tạo lớp / Nhập mã lớp, danh sách classroom cards. Tap card lớp → mở `ClassroomDetailScreen`. |
 | `screens/create_classroom_screen.dart` | Form tạo lớp, sau khi thành công hiển thị invite code + nút Copy. |
 | `screens/join_classroom_screen.dart` | Input invite code, gọi `joinClassroom`. |
+| `screens/classroom_switcher_sheet.dart` | Bottom sheet đổi lớp trong workspace. Load danh sách lớp bằng `ClassroomService.getMyClassrooms(...)`, chọn lớp khác thì trả classroom data cho màn hiện tại. |
 
 `HomeScreen` chỉ đóng vai trò chọn lớp để tiếp tục làm việc, không phải dashboard tổng. Dashboard/nghiệp vụ theo từng lớp nằm ở `ClassroomDetailScreen` và các tab con.
 
@@ -234,7 +235,8 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 | `HomeScreen` | `GET /api/classrooms/my` |
 | `CreateClassroomScreen` | `POST /api/classrooms/create` |
 | `JoinClassroomScreen` | `POST /api/classrooms/join` |
-| `ClassroomDetailScreen` | (không gọi, chỉ truyền data qua constructor) |
+| `ClassroomDetailScreen` | Mở `ClassroomSwitcherSheet`; chính màn detail không gọi API trực tiếp |
+| `ClassroomSwitcherSheet` | `GET /api/classrooms/my` |
 | `FundTab` | `GET /api/fund/collections/{classroomId}` + `GET /api/fund/payments/my/{classroomId}` |
 | `CreateCollectionScreen` | `POST /api/fund/collections` |
 | `CollectionPaymentsScreen` | `GET /api/fund/collections/{collectionId}/payments` + `PUT /api/fund/payments/{paymentId}/confirm` |
@@ -253,6 +255,9 @@ Splash (main → AuthWrapper)
    ├─ token có trong prefs → HomeScreen
    │       │
    │       ├─ Tap card lớp → ClassroomDetailScreen
+   │       │       │
+   │       │       ├─ Tap tên lớp ở header → ClassroomSwitcherSheet
+   │       │       │       └─ Chọn lớp khác → pushReplacement ClassroomDetailScreen
    │       │       │
    │       │       ├─ Tab Tổng quan
    │       │       ├─ Tab Khoản thu (FundTab)
@@ -301,8 +306,18 @@ Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace se
 ### ClassroomDetailScreen workspace
 `ClassroomDetailScreen` là workspace theo lớp sau khi chọn lớp:
 - `_DashboardHeader` là header compact dùng chung cho toàn bộ tab.
+- Tên lớp trong `_DashboardHeader` có thể bấm để mở `ClassroomSwitcherSheet`.
+- Khi chọn lớp khác, màn dùng `Navigator.pushReplacement` mở lại `ClassroomDetailScreen` với `classroomId`, `classroomName`, `inviteCode`, `role`, `faculty`, `academicYear` của lớp mới; tab mặc định quay về Tổng quan.
 - Identity card lớp và 3 stat cards chỉ nằm trong tab Tổng quan.
 - Các tab Quỹ/Sự kiện/Thành viên tập trung vào nội dung chính, không lặp lại card thông tin lớp.
+
+### ClassroomSwitcherSheet
+`ClassroomSwitcherSheet` là bottom sheet đổi lớp:
+- Nhận `currentClassroomId`.
+- Load danh sách lớp user đã tham gia bằng `ClassroomService.getMyClassrooms(userId)`.
+- Dùng `AppLoading`, `AppErrorState`, `AppEmptyState` cho loading/error/empty.
+- Lớp hiện tại hiển thị trạng thái `Đang chọn` và dấu check.
+- Tap lớp hiện tại chỉ đóng sheet; tap lớp khác trả classroom data qua `Navigator.pop(context, classroom)`.
 
 ### Confirm dialog
 2 action không hoàn tác có confirm:
