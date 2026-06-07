@@ -96,9 +96,15 @@ for u in sv1 sv2; do
     -d "{\"inviteCode\":\"$INVITE_CODE\"}"
 done
 
-# 5. Admin tạo khoản thu "Quỹ lớp tháng 5"
+# 5. Admin cấu hình tài khoản ngân hàng cho lớp (bắt buộc trước khi tạo khoản thu)
 CLASSROOM_ID=$(curl -s $BASE/classrooms/my \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq '.[0].id')
+curl -s -X PUT $BASE/classrooms/$CLASSROOM_ID/bank-account \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"bankBin":"970422","bankName":"Ngân hàng TMCP Quân đội","accountNo":"0123456789","accountName":"NGUYEN VAN A","note":"Tài khoản thủ quỹ lớp"}'
+
+# 6. Admin tạo khoản thu "Quỹ lớp tháng 5"
 curl -s -X POST $BASE/fund/collections \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
@@ -108,9 +114,10 @@ curl -s -X POST $BASE/fund/collections \
 Sau script:
 - 4 user đã đăng ký.
 - 1 lớp K64KTPM3 đã có 3 thành viên (1 Admin + 2 Member).
+- Tài khoản ngân hàng đã cấu hình cho lớp (MB Bank `0123456789`).
 - 1 khoản thu 50.000đ với 2 payment chưa xác nhận.
 
-→ Sẵn sàng demo từ Bước 5 trong `12-demo-script.md` (sinh viên xem QR).
+→ Sẵn sàng demo từ Bước 6 trong `12-demo-script.md` (sinh viên xem QR).
 
 ## 13.6. Reset
 
@@ -123,14 +130,15 @@ CREATE DATABASE classhub_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ## 13.7. Tài khoản ngân hàng (cho QR thật)
 
-⚠️ **PHẢI ĐỔI TRƯỚC DEMO** trong `application.properties`:
+> **Từ giai đoạn 8.5**, tài khoản ngân hàng **không dùng config cố định trong `application.properties`** nữa.
+> Config cũ (`vietqr.bank-bin`, `vietqr.account-no`, `vietqr.account-name`) đã được comment ra.
 
-```properties
-# Bank BIN — tra cứu tại https://api.vietqr.io/v2/banks
-vietqr.bank-bin=970422              # vd MB Bank
-vietqr.account-no=0123456789        # số tài khoản thật của em
-vietqr.account-name=NGUYEN DUY PHONG  # tên chủ TK (không dấu, UPPER)
-vietqr.template=compact2
-```
+**Cách cấu hình đúng:**
+1. Đăng nhập bằng tài khoản Admin.
+2. Trong tab "Khoản thu" của lớp → bấm **"Thiết lập tài khoản nhận tiền"**.
+3. Chọn ngân hàng, nhập số TK + chủ TK + ghi chú → bấm "Lưu".
+4. QR sẽ tự động dùng tài khoản vừa cấu hình.
 
-> Hiện tại `account-name` đang là `Nguyen Duy Phonggg` (typo "ggg") — sửa trước demo.
+Hoặc dùng API trực tiếp (xem bước 5 trong script 13.5 phía trên).
+
+> **Lưu ý:** Mỗi lớp có tài khoản riêng. Nếu đổi tài khoản, hệ thống giữ lịch sử (bản cũ `active=false`), QR luôn dùng tài khoản `active=true` hiện tại.

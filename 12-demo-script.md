@@ -226,4 +226,4 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 
 ## Backup plan: Demo bằng video
 
-Quay sẵn 1 video 3-5 phút chạy đủ 10 bước trên (dùng `flutter screenshot` + record màn hình). Để dự phòng nếu môi trường demo có vấn đề.
+Quay sẵn 1 video 3-5 phút chạy đủ 11 bước trên (dùng `flutter screenshot` + record màn hình). Để dự phòng nếu môi trường demo có vấn đề.

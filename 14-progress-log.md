@@ -11,7 +11,7 @@
 | Tổng hợp vấn đề thực tế (Zalo + Excel + Forms rời rạc) | ✅ |
 | Định nghĩa 3 phân hệ chính (Auth/Quỹ/Sự kiện) | ✅ |
 | Đăng ký đề tài + đề cương | ✅ |
-| Thiết kế ERD (8 bảng) | ✅ |
+| Thiết kế ERD (10 bảng — cập nhật theo quá trình phát triển) | ✅ |
 | Xác định 3 actor (Guest/Member/Admin) | ✅ |
 | Lập danh sách 21 endpoint dự kiến | ✅ |
 | Use Case Diagram | ✅ (text-based + Mermaid) |
@@ -22,7 +22,7 @@
 | Việc | Trạng thái |
 |---|---|
 | Setup Spring Boot project + MySQL | ✅ |
-| 8 entity + repository | ✅ |
+| 10 entity + repository (tăng dần theo các giai đoạn) | ✅ |
 | Auth: register/login + BCrypt + JWT generation | ✅ |
 | Classroom: create/join/list | ✅ |
 | Fund collections + payments + auto-sinh | ✅ |
@@ -238,10 +238,9 @@ Thêm chức năng chụp ảnh minh chứng điểm danh sự kiện.
 | Việc | Trạng thái |
 |---|---|
 | Thêm dependency `image_picker`, `http_parser`, `path` vào `pubspec.yaml` | ✅ |
-| Thêm màn `checkin_submission_screen.dart` | ✅ |
 | Cập nhật `event_service.dart`: thêm `submitCheckinImage` với `contentType: MediaType('image', ext)` | ✅ |
-| Cập nhật `events_tab.dart`: nút "Chụp ảnh điểm danh" cho Member đã đăng ký | ✅ |
-| Cập nhật `event_participants_screen.dart`: hiển thị trạng thái + xem ảnh + duyệt/từ chối | ✅ |
+| Cập nhật `events_tab.dart`: nút "Chụp ảnh điểm danh" + luồng chụp/preview/gửi **inline** (không tạo màn riêng) | ✅ |
+| Cập nhật `event_participants_screen.dart`: hiển thị trạng thái + xem ảnh + duyệt/từ chối **inline** | ✅ |
 
 ### Bug debug
 | Bug | Nguyên nhân | Fix |
@@ -265,7 +264,7 @@ Thêm chức năng chụp ảnh minh chứng điểm danh sự kiện.
 | FE tab Thành viên (sau khi BE có API) | 🟡 | 30 phút |
 | FE Dashboard quỹ (widget tổng quan) | 🟡 | 1-2 tiếng |
 | Smoke test BE bằng Postman | 🔴 | 15 phút |
-| Test E2E 13 bước demo trên 2 thiết bị | 🔴 | 30 phút |
+| Test E2E 11 bước demo trên 2 thiết bị | 🟡 | 30 phút |
 | Đổi `vietqr.account-no` thành TK thật | ~~đã obsolete: config cố định đã bị comment ra từ giai đoạn 8.5~~ | — |
 | `@Future` validate deadline/eventTime | 🟡 | 5 phút |
 | API edit/delete collection/event/expense | 🟢 | 1 tiếng |
