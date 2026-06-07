@@ -5,13 +5,13 @@
 | Loại test | Trạng thái | Ghi chú |
 |---|---|---|
 | Manual test (Postman + Flutter) | ✅ Đã làm theo demo script | Xem `12-demo-script.md` |
-| Test case TC01–TC20 đặc tả | ✅ Đã liệt kê dưới | |
+| Test case TC01–TC35 đặc tả | ✅ Đã liệt kê dưới | |
 | Test case tự động (JUnit + MockMvc) | 🟡 Chưa implement | Sẽ làm trong giai đoạn tiếp theo |
 | Test trên thiết bị thật | ⚠️ Cần test trước demo | Chạy FE với `--dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
 
-## 10.2. Bảng test case TC01–TC20
+## 10.2. Bảng test case TC01–TC35
 
-Test case bao phủ 4 nhóm: Auth, Classroom, Fund, Event.
+Test case bao phủ 5 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Event.
 
 | Mã TC | Module | Chức năng | Điều kiện | Kết quả mong đợi | Status |
 |---|---|---|---|---|---|
@@ -26,6 +26,13 @@ Test case bao phủ 4 nhóm: Auth, Classroom, Fund, Event.
 | TC09 | Classroom | Join lớp với mã hợp lệ | User chưa ở lớp đó | 200, role=MEMBER | ⬜ |
 | TC10 | Classroom | Join lớp đã tham gia rồi | User đã ở lớp | 400 "Bạn đã tham gia lớp này rồi" | ⬜ |
 | TC11 | Classroom | Join với mã không tồn tại | inviteCode = "ZZZZZZ" | 400 "Mã tham gia không hợp lệ" | ⬜ |
+| TC11a | Bank Account | Admin tạo/cập nhật tài khoản ngân hàng | Admin lớp, data hợp lệ | 200, tạo bản mới active=true, cũ chuyển inactive | ⬜ |
+| TC11b | Bank Account | Member xem tài khoản ngân hàng | Member lớp | 200, trả bank account active | ⬜ |
+| TC11c | Bank Account | Member cố cập nhật tài khoản | Member không phải Admin | **403** "Bạn không phải Admin của lớp" | ⬜ |
+| TC11d | Bank Account | User ngoài lớp xem tài khoản | User không thuộc lớp | **403** "Bạn không thuộc lớp này" | ⬜ |
+| TC11e | Bank Account | Admin xem lịch sử tài khoản | Admin lớp | 200, trả danh sách tất cả bản ghi (active + inactive) | ⬜ |
+| TC11f | Bank Account | Tạo khoản thu khi lớp chưa có tài khoản | Lớp chưa có bank account active | **400** "Vui lòng cấu hình tài khoản ngân hàng nhận tiền trước khi tạo khoản thu" | ⬜ |
+| TC11g | Bank Account | QR lấy tài khoản từ DB | Lớp có bank account active, member lấy QR | 200, QR chứa bankName/accountNo/accountName từ DB, không dùng config cố định | ⬜ |
 | TC12 | Fund | Member tạo khoản thu | User role=MEMBER | **403** "Chỉ Ban cán sự được phép thao tác" | ⬜ |
 | TC13 | Fund | Admin tạo khoản thu hợp lệ | amount=50000, deadline=tương lai | 200, sinh N payment cho N member | ⬜ |
 | TC14 | Fund | Tạo khoản thu amount=0 | amount = 0 | **400** "Số tiền phải lớn hơn 0" | ⬜ |
@@ -41,10 +48,15 @@ Test case bao phủ 4 nhóm: Auth, Classroom, Fund, Event.
 | TC24 | Event | User ngoài lớp đăng ký | userId không trong class_members | 403 "Bạn không thuộc lớp này" | ⬜ |
 | TC25 | Event | Member huỷ đăng ký chưa check-in | checkedIn=false | 204 | ⬜ |
 | TC26 | Event | Member huỷ sau khi đã check-in | checkedIn=true | 400 "Không thể hủy đăng ký sau khi đã check-in" | ⬜ |
-| TC27 | Event | Admin check-in | Participant chưa check-in | 200, set `checkedBy` + `checkedInAt` | ⬜ |
+| TC27 | Event | Admin check-in thủ công | Participant chưa check-in | 200, set `checkedBy` + `checkedInAt` | ⬜ |
 | TC28 | Event | Check-in lại sinh viên đã check-in | checkedIn=true | 400 "Sinh viên này đã được check-in rồi" | ⬜ |
+| TC-FILE-01 | Camera Check-in | Member gửi ảnh điểm danh hợp lệ | Ảnh jpg, size < 5MB, đã đăng ký sự kiện | 200, tạo submission PENDING, lưu file vào `classhub-uploads/` | ⬜ |
+| TC-FILE-02 | Camera Check-in | Gửi file không phải ảnh (pdf) | contentType = application/pdf hoặc extension .pdf | 400 "File phải là ảnh" | ⬜ |
+| TC-FILE-03 | Camera Check-in | Admin duyệt ảnh PENDING | submission.status=PENDING | 200, set APPROVED, set EventParticipant.checkedIn=true | ⬜ |
+| TC-FILE-04 | Camera Check-in | Admin từ chối ảnh kèm lý do | submission.status=PENDING | 200, set REJECTED, lưu rejectedReason | ⬜ |
+| TC-FILE-05 | Camera Check-in | Member gửi lại ảnh sau khi bị từ chối | submission REJECTED, member gửi mới | 200, tạo submission PENDING mới | ⬜ |
 
-**Tổng: 28 test case**.
+**Tổng: 40 test case** (thêm 5 test case cho Camera Check-in).
 
 ## 10.3. Bộ dữ liệu test
 
@@ -83,7 +95,7 @@ pm.environment.set("userId", json.userId);
 **Mỗi request authenticated:**
 - Tab Authorization → Type "Bearer Token" → token = `{{token}}`.
 
-**Chạy TC01–TC28** theo bảng trên, ghi kết quả Pass/Fail vào cột Status.
+**Chạy các test case** theo bảng trên, ghi kết quả Pass/Fail vào cột Status.
 
 ### 10.4.2. Bằng cURL
 
@@ -159,7 +171,7 @@ spring.jpa.hibernate.ddl-auto=create-drop
 
 ### 10.6.1. Test thủ công theo demo script
 
-Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự kiện.
+Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự kiện (bao gồm bước 4a cấu hình tài khoản ngân hàng trước khi tạo khoản thu).
 
 ### 10.6.2. Test đổi lớp trong workspace
 Điều kiện: user đã tham gia ít nhất 2 lớp.
@@ -183,6 +195,8 @@ Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự 
 Có thể viết widget test cho:
 - `LoginScreen` render đủ 2 field + nút submit.
 - `HomeScreen` hiển thị "Chưa tham gia lớp nào" khi list rỗng.
+- `ClassroomBankAccountScreen` validation không cho submit khi chưa chọn ngân hàng.
+- Bottom sheet search ngân hàng filter đúng khi gõ.
 
 → Đưa vào hướng phát triển.
 
@@ -212,7 +226,8 @@ Có thể viết widget test cho:
 
 ## 10.9. Tổng kết kiểm thử
 
-- **28 test case đặc tả** bao phủ 4 module, 4 loại HTTP status (200, 400, 401, 403).
+- **40 test case đặc tả** bao phủ 6 module (thêm 5 test case cho Camera Check-in), 4 loại HTTP status (200, 400, 401, 403).
 - **Manual test** đã chạy luồng E2E qua demo script (BE compile + FE pub get sạch).
+- **Camera Check-in** (đặc biệt TC-FILE-01 đến TC-FILE-05): đã implement BE+FE, build/analyze pass; **cần kiểm thử thực tế trên Android device** cho luồng chụp ảnh → upload → duyệt/từ chối.
 - **Test tự động** chưa implement — đưa vào kế hoạch giai đoạn tiếp theo.
-- **Bug history**: 8 bug critical đã fix toàn bộ trong audit B1–B8.
+- **Bug history**: 8 bug critical đã fix toàn bộ trong audit B1–B8 + bug Camera Check-in `contentType` (FE đã thêm `MediaType` khi upload multipart).

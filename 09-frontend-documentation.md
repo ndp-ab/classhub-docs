@@ -19,7 +19,7 @@ classhub_app/
 │   │   │                                  AppEmptyState, AppErrorState,
 │   │   │                                  AppLoading, PaymentStatusBadge
 │   │   ├── config/                     — AppConfig, API base URL
-│   │   ├── constants/                  — UserRoles, role helpers
+│   │   ├── constants/                  — UserRoles, vietnam_banks, role helpers
 │   │   └── utils/                      — formatVnd, formatDate,
 │   │                                      formatDateTime
 │   ├── models/                         — Data class parse JSON
@@ -66,7 +66,7 @@ classhub_app/
 
 ## 9.4. Danh sách màn hình
 
-Tổng **13 màn hình** chia 3 nhóm:
+Tổng **14 màn hình** chia 3 nhóm:
 
 ### 9.4.1. Auth (2 màn)
 | File | Mô tả |
@@ -74,29 +74,33 @@ Tổng **13 màn hình** chia 3 nhóm:
 | `screens/login_screen.dart` | Form email + password. Gọi `AuthProvider.login`. Thành công → `HomeScreen`. |
 | `screens/signup_screen.dart` | Form fullName + email + password. Gọi `AuthProvider.register`. Sau register cũng vào `HomeScreen`. |
 
-### 9.4.2. Classroom (3 màn)
+### 9.4.2. Classroom (5 màn)
 | File | Mô tả |
 |---|---|
 | `screens/home_screen.dart` | Class selector screen sau đăng nhập. Header ClassHub + greeting, 2 quick actions Tạo lớp / Nhập mã lớp, danh sách classroom cards. Tap card lớp → mở `ClassroomDetailScreen`. |
 | `screens/create_classroom_screen.dart` | Form tạo lớp, sau khi thành công hiển thị invite code + nút Copy. |
 | `screens/join_classroom_screen.dart` | Input invite code, gọi `joinClassroom`. |
 | `screens/classroom_switcher_sheet.dart` | Bottom sheet đổi lớp trong workspace. Load danh sách lớp bằng `ClassroomService.getMyClassrooms(...)`, chọn lớp khác thì trả classroom data cho màn hiện tại. |
+| `screens/classroom_bank_account_screen.dart` | **Mới (2026-06-05)**: Form cấu hình tài khoản ngân hàng nhận tiền của lớp. Chỉ Admin. Chọn ngân hàng từ bottom sheet search (20 ngân hàng VN hard-code), nhập số TK/chủ TK/ghi chú. Confirmation dialog trước khi lưu. |
 
 `HomeScreen` chỉ đóng vai trò chọn lớp để tiếp tục làm việc, không phải dashboard tổng. Dashboard/nghiệp vụ theo từng lớp nằm ở `ClassroomDetailScreen` và các tab con.
 
-### 9.4.3. Chi tiết lớp + 3 phân hệ (8 màn)
+### 9.4.3. Chi tiết lớp + 3 phân hệ (7 màn)
+
+> **Ghi chú:** `FundTab`, `ExpensesScreen` và `EventsTab` là tab/widget con trong `ClassroomDetailScreen`, không tính là màn nghiệp vụ độc lập. Vì vậy nhóm này có **7 màn độc lập** và **3 tab/widget hỗ trợ**.
+
 | File | Mô tả |
 |---|---|
 | `screens/classroom_detail_screen.dart` | Workspace theo lớp với header compact dùng chung, bottom navigation: Tổng quan, Quỹ, Sự kiện, Thành viên. Identity card lớp + stat cards chỉ hiển thị trong tab Tổng quan. |
-| `screens/fund/fund_tab.dart` | Tab "Khoản thu". Member thấy section "Khoản của bạn" + nút "Xem QR". Admin thấy FAB tạo đợt thu, tap card → chi tiết payments. |
-| `screens/fund/payment_qr_screen.dart` | Hiển thị QR (Image.network), nội dung CK + nút Copy. Polling status 5s/lần qua `Timer.periodic`. Dispose timer khi pop. |
+| `screens/fund/fund_tab.dart` | **Tab widget "Khoản thu"**. Đầu tab hiển thị card tài khoản nhận tiền của lớp (Admin có nút Thiết lập/Cập nhật, Member chỉ xem). Member thấy section "Khoản của bạn" + nút "Xem QR". Admin thấy FAB tạo đợt thu, tap card → chi tiết payments. |
+| `screens/fund/payment_qr_screen.dart` | Hiển thị QR (Image.network), **block thông tin tài khoản nhận tiền (ngân hàng, số TK, chủ TK)**, nội dung CK + nút Copy. Polling status 5s/lần qua `Timer.periodic`. Dispose timer khi pop. |
 | `screens/fund/collection_payments_screen.dart` | Admin xem ai đã/chưa đóng. Nút "Xác nhận" có confirm dialog. |
 | `screens/fund/create_collection_screen.dart` | Form tạo đợt thu (title, amount, deadline với DatePicker). |
-| `screens/fund/expenses_screen.dart` | Tab Khoản chi: list + tổng chi. FAB cho Admin. |
+| `screens/fund/expenses_screen.dart` | **Tab widget "Khoản chi"**: list + tổng chi. FAB cho Admin. |
 | `screens/fund/create_expense_screen.dart` | Form tạo khoản chi. |
-| `screens/events/events_tab.dart` | Tab Sự kiện. Member nút Đăng ký/Huỷ. Admin FAB tạo + nút "Người tham gia". |
+| `screens/events/events_tab.dart` | **Tab widget "Sự kiện"**. Member nút Đăng ký/Huỷ. Admin FAB tạo + nút "Người tham gia". **Camera Check-in (MVP):** Member đã đăng ký có nút "Chụp ảnh điểm danh" — chụp, preview và gửi minh chứng **inline trong tab này**, không có màn riêng. |
 | `screens/events/create_event_screen.dart` | Form sự kiện (DateTimePicker). |
-| `screens/events/event_participants_screen.dart` | Admin xem danh sách + nút Check-in (có confirm dialog). |
+| `screens/events/event_participants_screen.dart` | Admin xem danh sách + nút Check-in thủ công (có confirm dialog). **Camera Check-in (MVP):** Admin xem ảnh minh chứng, duyệt hoặc từ chối kèm lý do **ngay trong màn này**, không có màn riêng. |
 
 ## 9.5. Provider
 
@@ -122,9 +126,9 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 
 ## 9.6. Service
 
-4 service:
+5 service:
 
-`baseUrl` không hard-code trong từng service. Cả 4 service dùng chung
+`baseUrl` không hard-code trong từng service. Cả 5 service dùng chung
 `AppConfig.baseUrl` từ `lib/core/config/app_config.dart`.
 
 ### `services/auth_service.dart`
@@ -136,6 +140,8 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - `createClassroom(className, faculty, academicYear, userId)`
 - `joinClassroom(inviteCode, userId)`
 - `getMyClassrooms(userId)`
+- **`getBankAccount(classroomId)`** → `GET /api/classrooms/{classroomId}/bank-account`
+- **`updateBankAccount(classroomId, bankBin, bankName, accountNo, accountName, note)`** → `PUT /api/classrooms/{classroomId}/bank-account`
 - Tất cả gửi `Authorization: Bearer <token>` (đọc từ SharedPreferences).
 
 ### `services/fund_service.dart` (9 method)
@@ -143,11 +149,13 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - `getMyPayments / getPaymentQr / getPaymentStatus`
 - `getExpenses / createExpense`
 
-### `services/event_service.dart` (7 method)
+### `services/event_service.dart` (9 method)
 - `getEvents / createEvent`
 - `volunteer / cancelVolunteer`
 - `getParticipants / checkIn`
 - `getMyEvents`
+- **`submitCheckinImage(eventId, imagePath, userId)`** → `POST /api/events/{eventId}/checkin-submissions` với `http.MultipartFile.fromPath('file', imagePath, contentType: MediaType('image', ext))` — **bắt buộc set `contentType`** để BE validate đúng.
+- **`getCheckinSubmissions(eventId) / approveSubmission(submissionId) / rejectSubmission(submissionId, reason)`**
 
 ### Conventions service
 - Helper `_headers(userId, {json:true})` build header (Bearer + Content-Type nếu POST).
@@ -182,6 +190,7 @@ nữa, mà dùng `UserRoles.isAdminLike(...)`. Backend hiện chỉ có `ADMIN`/
 
 | File | Class | Parse từ |
 |---|---|---|
+| `models/classroom_bank_account.dart` | `ClassroomBankAccount` | `ClassroomBankAccountResponse` (parse `bankBin`, `bankName`, `accountNo`, `accountName`, `note`, `active`, `createdByName`) |
 | `models/fund_collection.dart` | `FundCollection` | `CollectionResponse` |
 | `models/payment.dart` | `Payment` | `PaymentResponse` (parse cả `amount`, `deadline`, `confirmedByName`) |
 | `models/expense.dart` | `Expense` | `ExpenseResponse` |
@@ -237,15 +246,16 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 | `JoinClassroomScreen` | `POST /api/classrooms/join` |
 | `ClassroomDetailScreen` | Mở `ClassroomSwitcherSheet`; chính màn detail không gọi API trực tiếp |
 | `ClassroomSwitcherSheet` | `GET /api/classrooms/my` |
-| `FundTab` | `GET /api/fund/collections/{classroomId}` + `GET /api/fund/payments/my/{classroomId}` |
+| `ClassroomBankAccountScreen` | `GET /api/classrooms/{classroomId}/bank-account` (load hiện tại) + `PUT /api/classrooms/{classroomId}/bank-account` (cập nhật) |
+| `FundTab` | `GET /api/fund/collections/{classroomId}` + `GET /api/fund/payments/my/{classroomId}` + `GET /api/classrooms/{classroomId}/bank-account` (card tài khoản) |
 | `CreateCollectionScreen` | `POST /api/fund/collections` |
 | `CollectionPaymentsScreen` | `GET /api/fund/collections/{collectionId}/payments` + `PUT /api/fund/payments/{paymentId}/confirm` |
 | `PaymentQrScreen` | `GET /api/fund/payments/{paymentId}/qr` + polling `GET /api/fund/payments/{paymentId}/status` |
 | `ExpensesScreen` | `GET /api/fund/expenses/{classroomId}` |
 | `CreateExpenseScreen` | `POST /api/fund/expenses` |
-| `EventsTab` | `GET /api/events/{classroomId}` + `GET /api/events/my/{classroomId}` + `POST /volunteer` / `DELETE /volunteer` |
+| `EventsTab` | `GET /api/events/{classroomId}` + `GET /api/events/my/{classroomId}` + `POST /volunteer` / `DELETE /volunteer` + **`POST /checkin-submissions`** (upload ảnh inline) |
 | `CreateEventScreen` | `POST /api/events` |
-| `EventParticipantsScreen` | `GET /api/events/{eventId}/participants` + `PUT /checkin/{userId}` |
+| `EventParticipantsScreen` | `GET /api/events/{eventId}/participants` + `PUT /checkin/{userId}` + **`GET /checkin-submissions`** + **`PUT /checkin-submissions/{id}/approve`** + **`PUT /checkin-submissions/{id}/reject`** |
 
 ## 9.12. Luồng điều hướng
 
@@ -268,8 +278,10 @@ Splash (main → AuthWrapper)
    │       │       │     └─ Admin: FAB → CreateExpenseScreen
    │       │       └─ Tab Sự kiện (EventsTab)
    │       │             ├─ Member: Đăng ký / Huỷ
+   │       │             ├─ Member đã đăng ký: "Chụp ảnh điểm danh" (inline, không navigate)
    │       │             └─ Admin: FAB Tạo → CreateEventScreen
    │       │                       "Người tham gia" → EventParticipantsScreen
+   │       │                       (Admin xem ảnh + duyệt/từ chối ngay trong màn này)
    │       │
    │       ├─ Tạo lớp → CreateClassroomScreen
    │       ├─ Nhập mã lớp → JoinClassroomScreen
@@ -332,6 +344,16 @@ Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace se
 - `AppSectionTitle` — tiêu đề section
 - `PaymentStatusBadge` + `paymentStatusColor/Icon/Label` helpers — semantic
   mapping UNPAID → warning, PENDING_VERIFICATION → primary, CONFIRMED → success
+
+### Bank account setup UI
+`ClassroomBankAccountScreen` dùng bottom sheet search để chọn ngân hàng:
+- Bottom sheet chứa search bar + scrollable list 20 ngân hàng VN (hard-code local từ `lib/core/constants/vietnam_banks.dart`)
+- User gõ search để filter danh sách (theo tên ngân hàng hoặc tên viết tắt)
+- User **bắt buộc chọn** từ danh sách, không được nhập tự do
+- Khi chọn ngân hàng → auto set `bankName` + `bankBin`
+- Bank BIN **không hiển thị** trên UI, chỉ gửi khi submit
+- Form validation: phải chọn ngân hàng trước khi submit
+- Confirmation dialog hiển thị: ngân hàng đã chọn, số tài khoản, chủ tài khoản, ghi chú (không hiển thị BIN)
 
 ## 9.14. Dependencies (`pubspec.yaml`)
 
@@ -397,6 +419,10 @@ flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
 | 5 | Loading dùng spinner đơn (`AppLoading`) | Skeleton shimmer (package `shimmer`) |
 | 6 | Chưa có sửa/xoá UI | BE thêm `PUT/DELETE` rồi FE thêm sau |
 | 7 | Polling QR fail silent khi mất mạng | Thêm error message + nút retry |
+| 8 | **Danh sách ngân hàng hard-code local 20 ngân hàng VN trong `lib/core/constants/vietnam_banks.dart`** | BE thêm API `/api/banks` dynamic + logo ngân hàng |
+| 9 | **Chưa có UI lịch sử tài khoản ngân hàng** | FE thêm màn history sau khi BE có API `/api/classrooms/{id}/bank-account/history` |
+| 10 | **Camera Check-in đã implement; cần kiểm thử thực tế trên Android device thật** | Chạy bằng `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` và test luồng chụp ảnh → upload → duyệt |
+| 11 | **`/uploads/**` hiện public — ảnh minh chứng ai cũng xem được qua URL** | Hướng phát triển: API download có JWT + phân quyền theo lớp |
 
 ## 9.17. Trạng thái build
 

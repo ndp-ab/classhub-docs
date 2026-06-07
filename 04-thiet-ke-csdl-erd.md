@@ -2,7 +2,7 @@
 
 ## 4.1. Tổng quan
 
-ClassHub sử dụng **MySQL 8** với 8 bảng. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
+ClassHub sử dụng **MySQL 8** với **10 bảng**. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
 
 Database: `classhub_db` (charset `utf8mb4`).
 
@@ -18,6 +18,8 @@ Database: `classhub_db` (charset `utf8mb4`).
 | 6 | `fund_expenses` | Khoản chi | 7 |
 | 7 | `events` | Sự kiện lớp | 8 |
 | 8 | `event_participants` | Sinh viên đăng ký + check-in sự kiện | 7 |
+| 9 | `classroom_bank_accounts` | Tài khoản ngân hàng nhận tiền theo lớp | 10 |
+| 10 | `event_checkin_submissions` | Ảnh minh chứng điểm danh sự kiện | 13 |
 
 ## 4.3. Sơ đồ ERD (Mermaid)
 
@@ -31,14 +33,20 @@ erDiagram
     USERS ||--o{ EVENTS : "tạo (admin)"
     USERS ||--o{ EVENT_PARTICIPANTS : "đăng ký"
     USERS ||--o{ EVENT_PARTICIPANTS : "check-in (admin)"
+    USERS ||--o{ CLASSROOM_BANK_ACCOUNTS : "cấu hình"
 
     CLASSROOMS ||--o{ CLASS_MEMBERS : "có"
     CLASSROOMS ||--o{ FUND_COLLECTIONS : "có"
     CLASSROOMS ||--o{ FUND_EXPENSES : "có"
     CLASSROOMS ||--o{ EVENTS : "có"
+    CLASSROOMS ||--o{ CLASSROOM_BANK_ACCOUNTS : "có tài khoản nhận tiền"
 
     FUND_COLLECTIONS ||--o{ FUND_PAYMENTS : "sinh ra"
     EVENTS ||--o{ EVENT_PARTICIPANTS : "có"
+    EVENTS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "có"
+    EVENT_PARTICIPANTS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "từ participant"
+    USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "gửi ảnh (user)"
+    USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "duyệt (reviewed_by)"
 
     USERS {
         bigint id PK
@@ -117,6 +125,36 @@ erDiagram
         datetime checked_in_at
         bigint checked_by FK
         datetime registered_at
+    }
+
+    CLASSROOM_BANK_ACCOUNTS {
+        bigint id PK
+        bigint classroom_id FK
+        varchar bank_bin
+        varchar bank_name
+        varchar account_no
+        varchar account_name
+        boolean active
+        varchar note
+        bigint created_by FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    EVENT_CHECKIN_SUBMISSIONS {
+        bigint id PK
+        bigint event_id FK
+        bigint user_id FK
+        bigint participant_id FK
+        varchar image_path
+        varchar original_filename
+        varchar content_type
+        bigint file_size
+        enum status "PENDING|APPROVED|REJECTED"
+        datetime submitted_at
+        bigint reviewed_by FK
+        datetime reviewed_at
+        varchar rejected_reason
     }
 ```
 
@@ -256,6 +294,29 @@ UNIQUE KEY (event_id, user_id)
 ```
 → Một sinh viên không đăng ký 2 lần cho cùng 1 sự kiện. DB chặn ngay cả khi service có lỗi race condition.
 
+### 4.4.9. `classroom_bank_accounts` — Tài khoản ngân hàng nhận tiền theo lớp
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
+| `classroom_id` | BIGINT | FK → classrooms.id, NOT NULL | Lớp sở hữu tài khoản |
+| `bank_bin` | VARCHAR(6) | NOT NULL | Mã ngân hàng VietQR (VD: 970422=MB, 970436=VCB) |
+| `bank_name` | VARCHAR(100) | NOT NULL | Tên ngân hàng hiển thị cho user |
+| `account_no` | VARCHAR(20) | NOT NULL | Số tài khoản nhận tiền |
+| `account_name` | VARCHAR(100) | NOT NULL | Tên chủ tài khoản |
+| `active` | BOOLEAN | NOT NULL DEFAULT TRUE | Chỉ 1 tài khoản active=true / 1 classroom |
+| `note` | VARCHAR(500) | NULL | Ghi chú (lý do thay đổi tài khoản) |
+| `created_by` | BIGINT | FK → users.id, NOT NULL | Admin tạo/cập nhật tài khoản |
+| `created_at` | DATETIME | NOT NULL, không update | Thời điểm tạo |
+| `updated_at` | DATETIME | NULL | Thời điểm cập nhật |
+
+**Lý do thiết kế:**
+- **Mỗi lớp có tài khoản riêng** thay vì dùng tài khoản cố định toàn hệ thống.
+- **Giữ lịch sử**: Khi admin đổi tài khoản, hệ thống không xóa bản cũ mà chuyển `active=false` và tạo bản mới `active=true`.
+- **QR động**: API sinh QR luôn lấy tài khoản có `active=true` của lớp đó.
+- `bank_bin` dùng để build URL VietQR.
+- `created_by` để audit ai đã cấu hình/thay đổi tài khoản (yêu cầu truy vết).
+
 ## 4.5. Quan hệ giữa các bảng (giải thích)
 
 | Quan hệ | Cardinality | Bảng liên kết | Ý nghĩa nghiệp vụ |
@@ -270,6 +331,12 @@ UNIQUE KEY (event_id, user_id)
 | Event 1 — n EventParticipant | 1-n | | Một sự kiện có nhiều người đăng ký |
 | User 1 — n EventParticipant | 1-n | | Một sinh viên đăng ký nhiều sự kiện |
 | User 1 — n EventParticipant (checkedBy) | 1-n | | Audit ai check-in |
+| Event 1 — n EventCheckinSubmission | 1-n | | Một sự kiện có nhiều lượt gửi ảnh |
+| User 1 — n EventCheckinSubmission (user) | 1-n | | Member gửi ảnh |
+| EventParticipant 1 — n EventCheckinSubmission | 1-n | | Theo dõi lịch sử submit của 1 participant |
+| User 1 — n EventCheckinSubmission (reviewedBy) | 1-n | | Admin duyệt/từ chối |
+| Classroom 1 — n ClassroomBankAccount | 1-n | | Một lớp có nhiều tài khoản qua lịch sử (chỉ 1 active tại 1 thời điểm) |
+| User 1 — n ClassroomBankAccount (createdBy) | 1-n | | Admin cấu hình tài khoản |
 
 ## 4.6. Quyết định thiết kế quan trọng
 
@@ -281,8 +348,11 @@ UNIQUE KEY (event_id, user_id)
 | Auto-sinh payment khi nào? | (1) Khi tạo collection (sinh cho all members), (2) Khi member join lớp (sinh cho all existing collections) | Đảm bảo không bỏ sót member nào |
 | Audit trail | Lưu `confirmed_by` + `paid_at` ở payment; `checked_by` + `checked_in_at` ở participant | Hội đồng hỏi "ai làm" trả lời được |
 | Chống đăng ký trùng | `UNIQUE(event_id, user_id)` + check ở service | 2 lớp bảo vệ: app + DB |
-| FetchType cho FK | `LAZY` ở mọi `@ManyToOne` | Tránh load entity không cần thiết, performance tốt hơn |
+| Lưu ảnh minh chứng đâu? | File ngoài repo (`classhub.upload-dir`), DB chỉ lưu `image_path` và metadata | Không phình MySQL, dễ backup/di chuyển file riêng |
+| Tại sao không nhét vào `event_participants`? | Tách bảng riêng `event_checkin_submissions` | Giữ lịch sử submit/reject/resubmit; 1 participant có thể có nhiều submission (gửi lại sau khi bị từ chối) |
+| `/uploads/**` có bảo mật không? | Hiện public cho MVP/demo | Hướng phát triển: API download có JWT + phân quyền theo lớp/sự kiện |
 | Timezone | `Asia/Ho_Chi_Minh` trong JDBC URL | Đảm bảo timestamp đúng giờ Việt Nam |
+| Tài khoản ngân hàng | Tách bảng riêng, giữ history bằng active flag | Hỗ trợ mỗi lớp có tài khoản riêng; QR động theo lớp; admin có thể đổi tài khoản mà vẫn truy vết được lịch sử |
 
 ## 4.7. Script tạo DB (rút gọn)
 
@@ -294,9 +364,29 @@ GRANT ALL PRIVILEGES ON classhub_db.* TO 'classhub_user'@'localhost';
 
 Schema còn lại do **Hibernate `ddl-auto=update`** tự sinh khi khởi động Spring Boot lần đầu (đọc các `@Entity` Java).
 
-## 4.8. Tổng kết
+## 4.8. Mô tả chi tiết bảng `event_checkin_submissions`
 
-- **8 bảng** đầy đủ cho 3 phân hệ.
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
+| `event_id` | BIGINT | FK → events.id, NOT NULL | Sự kiện |
+| `user_id` | BIGINT | FK → users.id, NOT NULL | Member gửi ảnh |
+| `participant_id` | BIGINT | FK → event_participants.id, NOT NULL | Participant tương ứng |
+| `image_path` | VARCHAR(500) | NOT NULL | Đường dẫn relative: `/uploads/event-checkins/...` |
+| `original_filename` | VARCHAR(255) | NULL | Tên file gốc từ FE |
+| `content_type` | VARCHAR(100) | NULL | MIME type: `image/jpeg`, `image/png` |
+| `file_size` | BIGINT | NULL | Kích cỡ byte |
+| `status` | ENUM | NOT NULL | `PENDING`, `APPROVED`, `REJECTED` |
+| `submitted_at` | DATETIME | NOT NULL, auto | Thời điểm gửi ảnh |
+| `reviewed_by` | BIGINT | FK → users.id, NULL | Admin duyệt/từ chối |
+| `reviewed_at` | DATETIME | NULL | Thời điểm duyệt |
+| `rejected_reason` | VARCHAR(500) | NULL | Lý do từ chối |
+
+## 4.9. Tổng kết
+
+- **10 bảng** đầy đủ cho 3 phân hệ + tài khoản ngân hàng động + ảnh minh chứng check-in.
 - Quan hệ n-n giữa User và Classroom giải quyết qua bảng `class_members` — đây là điểm "đúng OOAD" nhất của thiết kế.
-- Audit trail (`confirmed_by`, `checked_by`) đảm bảo truy vết được mọi hành động.
+- Audit trail (`confirmed_by`, `checked_by`, `created_by` ở bank account, `reviewed_by` ở submission) đảm bảo truy vết được mọi hành động.
 - Sử dụng các kiểu dữ liệu phù hợp: BigDecimal cho tiền, LocalDate cho hạn, LocalDateTime cho timestamp.
+- **Tài khoản ngân hàng theo lớp** giải quyết bài toán mỗi lớp có quỹ riêng, QR thanh toán động, và giữ lịch sử thay đổi.
+- **Ảnh minh chứng** lưu ngoài DB (file system), DB chỉ lưu path + metadata — tránh phình MySQL và dễ scale storage.

@@ -50,7 +50,7 @@ GRANT ALL PRIVILEGES ON classhub_db.* TO 'classhub_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-> **Schema (8 bảng) sẽ được Hibernate auto-tạo** khi BE chạy lần đầu (`ddl-auto=update`).
+> **Schema (10 bảng) sẽ được Hibernate auto-tạo** khi BE chạy lần đầu (`ddl-auto=update`).
 
 ### 11.3.2. Cấu hình `application.properties`
 
@@ -73,12 +73,15 @@ server.port=8080
 jwt.secret=classhub-super-secret-key-2026-do-an-tot-nghiep-spring-boot-flutter
 jwt.expiration=86400000
 
-# VietQR — ĐỔI THÔNG TIN NGÂN HÀNG THẬT TRƯỚC KHI DEMO
-# Bank BIN: MB=970422 | VCB=970436 | TCB=970407 | ACB=970416 | VPB=970432 | TPB=970423 | BIDV=970418
-vietqr.bank-bin=970415
-vietqr.account-no=109875610620
-vietqr.account-name=Nguyen Duy Phong
+# VietQR — Không còn dùng config cố định
+# Tài khoản nhận tiền lấy từ DB table classroom_bank_accounts
+# vietqr.bank-bin=970415
+# vietqr.account-no=109875610620
+# vietqr.account-name=Nguyen Duy Phong
 vietqr.template=compact2
+
+# Upload ảnh minh chứng — ĐƯờng dẫn thư mục lưu file (ngoài repo)
+classhub.upload-dir=D:/big_dream/classhub-uploads
 ```
 
 ### 11.3.3. Chạy backend
@@ -188,6 +191,8 @@ Windows Firewall mặc định chặn inbound port 8080.
 | FE: 401 dù vừa login | JWT secret BE thay đổi sau khi login | Logout → login lại trên FE |
 | FE Android emulator: `Connection refused` | Dùng `localhost` (sai) | Chạy với `--dart-define=API_BASE_URL=http://10.0.2.2:8080/api` |
 | Hibernate: `Unknown column 'confirmed_by'` | Đã upgrade code B3 nhưng MySQL chưa ALTER | `ddl-auto=update` phải bật; restart BE |
+| BE: Ảnh upload 400 "File phải là ảnh" | FE không set `contentType` trong `MultipartFile.fromPath` | FE thêm `contentType: MediaType('image', 'jpeg')` |
+| BE: `upload-dir` không tồn tại | Thư mục `classhub-uploads` chưa tạo | Tạo thủ công: `mkdir D:/big_dream/classhub-uploads` |
 
 ## 11.7. Reset / clean data
 

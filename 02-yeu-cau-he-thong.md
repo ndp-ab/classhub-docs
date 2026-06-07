@@ -52,6 +52,12 @@
 | FR-5.8 | Check-in (đánh dấu có mặt) cho từng sinh viên | Admin của lớp |
 | FR-5.9 | Hệ thống lưu **ai check-in** và **lúc nào** | Hệ thống |
 | FR-5.10 | Sinh viên xem các sự kiện mình đã đăng ký | Member |
+| FR-5.11 | Member gửi ảnh minh chứng điểm danh cho sự kiện đã đăng ký (upload multipart/form-data) | Member |
+| FR-5.12 | Hệ thống lưu file ảnh ngoài DB, lưu metadata và đường dẫn trong DB | Hệ thống |
+| FR-5.13 | Admin xem ảnh minh chứng của từng người tham gia | Admin của lớp |
+| FR-5.14 | Admin duyệt ảnh minh chứng để xác nhận check-in | Admin của lớp |
+| FR-5.15 | Admin từ chối ảnh minh chứng kèm lý do | Admin của lớp |
+| FR-5.16 | Member được gửi lại ảnh nếu submission bị từ chối | Member |
 
 ## 2.2. Yêu cầu phi chức năng (Non-functional Requirements)
 
@@ -86,6 +92,15 @@
 | NFR-3.4 | Pull-to-refresh trên danh sách |
 | NFR-3.5 | Loading / error / empty state rõ ràng cho từng màn |
 
+### NFR-6. Upload ảnh minh chứng
+| Mã | Yêu cầu | Trạng thái |
+|---|---|---|
+| NFR-6.1 | Ảnh upload tối đa 5MB | ✅ Validate ở FileStorageService |
+| NFR-6.2 | Chỉ chấp nhận định dạng jpg/jpeg/png | ✅ ALLOWED_EXTENSIONS |
+| NFR-6.3 | Ảnh không lưu binary/base64 trong DB — chỉ lưu đường dẫn | ✅ Thiết kế tách bảng |
+| NFR-6.4 | `/uploads/**` public cho MVP/demo để Flutter hiển thị ảnh nhanh | ✅ WebMvcConfig |
+| NFR-6.5 | Hướng phát triển: API download có JWT/authorization khi cần bảo mật cao hơn | 🟢 Hướng phát triển |
+
 ### NFR-4. Hiệu năng
 | Mã | Yêu cầu |
 |---|---|
@@ -119,17 +134,18 @@
 
 ## 2.4. Mức độ hoàn thành so với yêu cầu
 
-| Nhóm | Hoàn thành |
-|---|---|
-| FR-1 Tài khoản | 3/3 ✅ |
-| FR-2 Lớp | 5/5 ✅ |
-| FR-3 Khoản thu | 11/11 ✅ |
-| FR-4 Khoản chi | 2/2 ✅ |
-| FR-5 Sự kiện | 10/10 ✅ |
-| NFR-1 Bảo mật | 8/8 ✅ |
-| NFR-2 Validation | 6/6 ✅ |
-| NFR-3 Trải nghiệm | 5/5 ✅ |
-| NFR-4 Hiệu năng | 3/3 ✅ |
-| NFR-5 Dữ liệu | 5/5 ✅ |
+| Nhóm | Hoàn thành | Ghi chú |
+|---|---|---|
+| FR-1 Tài khoản | 3/3 ✅ | |
+| FR-2 Lớp | 5/5 ✅ | |
+| FR-3 Khoản thu | 11/11 ✅ | |
+| FR-4 Khoản chi | 2/2 ✅ | |
+| FR-5 Sự kiện | 16/16 ✅ code / ⚠️ cần test device | FR-5.11–5.16 đã implement BE+FE, build/analyze pass; cần kiểm thử thực tế trên Android device cho luồng chụp ảnh → upload → duyệt |
+| NFR-1 Bảo mật | 8/8 ✅ | |
+| NFR-2 Validation | 6/6 ✅ | |
+| NFR-3 Trải nghiệm | 5/5 ✅ | |
+| NFR-4 Hiệu năng | 3/3 ✅ | |
+| NFR-5 Dữ liệu | 5/5 ✅ | |
+| NFR-6 Upload ảnh | 4/5 ✅ / 1🟢 | NFR-6.5 là hướng phát triển |
 
-**Tổng: 58 yêu cầu đạt được trên 58 đề ra.**
+**Tổng: 64 yêu cầu** (thêm 6 FR camera check-in + 5 NFR upload ảnh). Code đã implement toàn bộ; FR-5.11–5.16 và NFR-6 cần kiểm thử E2E trên thiết bị thật để xác nhận hoàn chỉnh.

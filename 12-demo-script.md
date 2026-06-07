@@ -1,7 +1,7 @@
 # 12 — Demo Script
 
-> Kịch bản demo trước hội đồng. **Tổng thời gian: 8–10 phút.**
-> Mục tiêu: thể hiện đủ 3 phân hệ + 5 điểm bảo mật/audit mà hội đồng dễ hỏi.
+> Kịch bản demo trước hội đồng. **Tổng thời gian: 10–12 phút.**
+> Mục tiêu: thể hiện đủ 3 phân hệ + Camera Check-in + 5 điểm bảo mật/audit mà hội đồng dễ hỏi.
 
 ## Setup trước demo
 
@@ -33,16 +33,43 @@
 2. Đăng nhập `sv1@demo.com` / `12345678`.
 3. Đã có sẵn lớp K64KTPM3 (đã join từ trước).
 
-### Bước 4 — Tạo khoản thu (1 phút)
+### Bước 4 — Cấu hình tài khoản ngân hàng (1 phút)
 **Trên laptop (Admin):**
 1. Tap card lớp K64KTPM3 → vào ClassroomDetail.
-2. Có thể bấm tên lớp ở header để mở danh sách lớp và chuyển nhanh sang lớp khác nếu cần demo multi-class.
-3. Sang tab "Khoản thu" → bấm FAB "Tạo đợt thu".
-4. Nhập: title = "Quỹ lớp tháng 5", amount = 50000, deadline = ngày mai → bấm Tạo.
+2. Sang tab "Khoản thu".
+3. Đầu tab có card "Tài khoản nhận tiền" hiển thị "Chưa cấu hình".
+4. Bấm "Thiết lập tài khoản nhận tiền" → mở màn cấu hình.
+5. Bấm trường "Ngân hàng" → bottom sheet mở với search bar + danh sách 20 ngân hàng VN.
+6. Gõ "MB" trong search → danh sách lọc chỉ còn "Ngân hàng TMCP Quân đội (MB Bank)".
+7. Chọn MB Bank → bottom sheet đóng, trường "Ngân hàng" hiển thị **"MB Bank"**.
+8. Nhập:
+   - Số tài khoản: `0123456789`
+   - Chủ tài khoản: `NGUYEN VAN A`
+   - Ghi chú: `Tài khoản thủ quỹ lớp`
+9. Bấm "Lưu thông tin" → confirmation dialog hiện:
+   ```
+   Xác nhận lưu thông tin tài khoản
+
+   Ngân hàng: Ngân hàng TMCP Quân đội
+   Số tài khoản: 0123456789
+   Chủ tài khoản: NGUYEN VAN A
+   Ghi chú: Tài khoản thủ quỹ lớp
+
+   [Kiểm tra lại] [Xác nhận lưu]
+   ```
+10. Bấm "Xác nhận lưu" → snackbar xanh "Đã lưu tài khoản nhận tiền".
+11. Card "Tài khoản nhận tiền" cập nhật hiển thị thông tin vừa lưu.
+
+> Nói: "**Admin phải cấu hình tài khoản ngân hàng trước khi tạo khoản thu.** Hệ thống sẽ chặn tạo khoản thu nếu chưa có tài khoản. Mỗi lớp có tài khoản riêng, QR sẽ dùng tài khoản này."
+
+### Bước 5 — Tạo khoản thu (1 phút)
+**Trên laptop (Admin):**
+1. Vẫn trong tab "Khoản thu" → bấm FAB "Tạo đợt thu".
+2. Nhập: title = "Quỹ lớp tháng 5", amount = 50000, deadline = ngày mai → bấm Tạo.
 
 > Nói: "**Khi admin tạo, hệ thống tự sinh bản ghi nợ cho cả 3 thành viên cùng lúc** — không phải tạo thủ công cho từng người."
 
-### Bước 5 — Sinh viên xem khoản nợ + lấy QR (1.5 phút)
+### Bước 6 — Sinh viên xem khoản nợ + lấy QR (1.5 phút)
 **Trên điện thoại (Member):**
 1. Mở lớp K64KTPM3 → tab Khoản thu.
 2. Section "Khoản của bạn" hiển thị: **"Quỹ lớp tháng 5 — 50.000 đ — Hạn dd/mm/yyyy"**.
@@ -51,15 +78,22 @@
 
 3. Bấm "Xem QR" → màn QR mở.
 4. QR VietQR hiển thị, kèm số tiền + **nội dung chuyển khoản duy nhất** (`QUY...-SV...-timestamp`).
+5. **Block thông tin tài khoản nhận tiền hiển thị:**
+   ```
+   Tài khoản nhận tiền
+   Ngân hàng: Ngân hàng TMCP Quân đội
+   Số tài khoản: 0123456789
+   Chủ tài khoản: NGUYEN VAN A
+   ```
 
-> Nói: "Nội dung chuyển khoản là **mã duy nhất**, admin đối chiếu sao kê là biết em nào đã chuyển."
+> Nói: "**QR và thông tin tài khoản lấy từ cấu hình của lớp trong DB, không dùng tài khoản cố định.** Nội dung chuyển khoản là **mã duy nhất**, admin đối chiếu sao kê là biết em nào đã chuyển."
 
-5. Bấm copy nội dung CK (đã copy vào clipboard).
-6. Phía dưới hiển thị: "Đang chờ admin xác nhận... (tự cập nhật)" với spinner.
+6. Bấm copy nội dung CK (đã copy vào clipboard).
+7. Phía dưới hiển thị: "Đang chờ admin xác nhận... (tự cập nhật)" với spinner.
 
 > Nói: "App polling trạng thái mỗi 5 giây, tự dừng khi admin xác nhận."
 
-### Bước 6 — Admin xác nhận thanh toán (1 phút)
+### Bước 7 — Admin xác nhận thanh toán (1 phút)
 **Trên laptop (Admin):**
 1. Tap card đợt thu "Quỹ lớp tháng 5" → vào danh sách payments.
 2. Thấy sv1 (chưa đóng — chip cam) và sv2 (chưa đóng).
@@ -72,14 +106,14 @@
 
 > Nói: "Backend lưu **ai đã xác nhận** và **lúc nào** — đây là audit trail."
 
-### Bước 7 — Member thấy trạng thái cập nhật (real-time qua polling) (30 giây)
+### Bước 8 — Member thấy trạng thái cập nhật (real-time qua polling) (30 giây)
 **Trên điện thoại (Member):**
 - Vẫn ở màn QR.
 - Trong khoảng **≤ 5 giây**, status đổi từ orange "Đang chờ" → xanh "**Đã thanh toán & được xác nhận**".
 
 > Nói: "Sinh viên thấy trạng thái cập nhật mà không cần refresh — đây là cảm giác 'real-time' nhờ polling."
 
-### Bước 8 — Demo phân hệ Sự kiện (1.5 phút)
+### Bước 9 — Demo phân hệ Sự kiện + **Camera Check-in** (2.5 phút)
 
 **Trên laptop (Admin):**
 1. Sang tab "Sự kiện" → FAB "Tạo sự kiện".
@@ -88,16 +122,22 @@
 **Trên điện thoại (Member):**
 3. Sang tab "Sự kiện" → kéo refresh.
 4. Thấy sự kiện mới. Bấm "Đăng ký" → chip "Đã đăng ký" hiện ra.
+5. Bấm **"Chụp ảnh điểm danh"** → camera mở.
+6. Chụp ảnh → preview hiển thị.
+7. Bấm **"Gửi minh chứng"** → app báo "Chờ ban cán sự xác nhận".
+
+> Nói: "Member chụp ảnh ngay trong app, không cần gửi qua Zalo. Ảnh lưu trên server với metadata rõ ràng (ai gửi, khi nào, sự kiện nào)."
 
 **Trên laptop (Admin):**
-5. Vào sự kiện → "Người tham gia" → thấy sv1.
-6. Bấm "Check-in" → confirm dialog → check-in.
+8. Vào sự kiện → **"Người tham gia"** → thấy sv1 có trạng thái **"Chờ duyệt ảnh"**.
+9. Bấm xem ảnh → ảnh hiển thị.
+10. Bấm "Duyệt" → confirm dialog → xác nhận.
 
-> Nói: "Tương tự xác nhận thanh toán, **lưu ai check-in và lúc nào** để truy vết."
+> Nói: "Tương tự xác nhận thanh toán, **lưu ai duyệt và lúc nào** — audit trail. Và nếu ảnh không đúng — Admin từ chối kèm lý do, Member gửi lại được."
 
-7. Counter "Check-in: 1/1" cập nhật.
+11. Counter "Check-in: 1/1" cập nhật.
 
-### Bước 9 — Demo bảo mật (2 phút) — **Quan trọng nhất**
+### Bước 10 — Demo bảo mật (2 phút) — **Quan trọng nhất**
 
 Mở Postman / cURL. Chứng minh 3 điểm bảo mật:
 
@@ -143,7 +183,7 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 
 > "Admin lớp này **không thao tác được** dữ liệu lớp khác."
 
-### Bước 10 — Tổng kết (30 giây)
+### Bước 11 — Tổng kết (30 giây)
 
 > "Đã demo:
 > 1. **3 phân hệ** (Auth, Quỹ, Sự kiện) chạy end-to-end.
@@ -160,13 +200,20 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 |---|---|
 | "Khác Excel/Zalo thế nào?" | "Dữ liệu tập trung, phân quyền theo lớp, sinh viên tự xem nợ, audit trail." |
 | "QR có tự động không?" | "QR sinh URL VietQR, sinh viên CK, admin đối chiếu sao kê + bấm xác nhận. Đây là **bán tự động**. Tự động hoàn toàn cần webhook ngân hàng — hướng phát triển." |
+| "Tài khoản ngân hàng lấy từ đâu?" | "Admin cấu hình cho từng lớp trong tab Quỹ. Lưu vào DB table `classroom_bank_accounts`. Mỗi lớp có tài khoản riêng, QR dùng tài khoản đó. Không dùng tài khoản cố định." |
+| "Nếu đổi tài khoản thì sao?" | "Admin cập nhật lại, hệ thống tạo bản ghi mới `active=true`, bản cũ chuyển `active=false` để giữ lịch sử. QR luôn lấy tài khoản active hiện tại." |
+| "Tại sao không nhập Bank BIN bằng tay?" | "Để tránh nhập sai. Admin chỉ chọn từ danh sách 20 ngân hàng phổ biến VN, hệ thống tự map Bank BIN. User không nhìn thấy BIN trên UI." |
+| "Danh sách ngân hàng lấy từ đâu?" | "Hiện hard-code local 20 ngân hàng VN trong FE (`lib/core/constants/vietnam_banks.dart`). Hướng phát triển: BE thêm API `/api/banks` dynamic + logo." |
 | "Token lưu ở đâu?" | "Server stateless, không lưu. Client lưu SharedPreferences, mỗi request gắn Authorization Bearer." |
 | "Mã mời sinh thế nào?" | "6 ký tự uppercase từ UUID, unique constraint ở DB." |
 | "Thầy có token, có vào được API người khác không?" | "Token có claim userId. Service luôn check `userId == payment.user.id` cho action lấy QR/status. Còn action chỉnh sửa thì check role qua `ClassMember.role`." |
 | "Sinh viên join lớp sau khi đã có khoản thu thì sao?" | "Có. `joinClassroom` query mọi collection của lớp + sinh payment bổ sung cho user mới. Đã test." |
 | "Confirm thanh toán 2 lần thì sao?" | "Backend chặn idempotent — trả 400 'đã được xác nhận'. Frontend cũng có confirm dialog." |
-| "Có test case chưa?" | "Có 28 test case đặc tả ở `10-kiem-thu.md`, đã chạy manual qua Postman. Test tự động JUnit + MockMvc đưa vào giai đoạn tiếp theo." |
-| "Hạn chế hiện tại?" | "(1) Chưa có tab Thành viên — chờ API BE. (2) Chưa có dashboard thống kê quỹ. (3) Hệ thống hiện chỉ triển khai role ADMIN/MEMBER; OWNER chỉ là hướng mở rộng, chưa có trong code hiện tại. (4) Đối soát ngân hàng thủ công. Tất cả ở mục Hướng phát triển." |
+| "Camera Check-in hoạt động thế nào?" | "Member chụp ảnh trong app → FE upload multipart/form-data lên BE → BE validate contentType + extension + size → lưu file vào disk, lưu metadata vào DB (bảng `event_checkin_submissions`, status=PENDING). Admin mở danh sách → xem ảnh → Duyệt (set checkedIn=true + audit) hoặc Từ chối (Member gửi lại)." |
+| "Tại sao FE lúc đầu bị lỗi 'File phải là ảnh'?" | "FE không set `contentType` trong `MultipartFile.fromPath` nên BE nhận null/octet-stream. Đã sửa: thêm `contentType: MediaType('image', 'jpeg')` — BE validate pass." |
+| "Ảnh lưu ở đâu?" | "Ngoài repo: `D:/big_dream/classhub-uploads/event-checkins/`. DB chỉ lưu `image_path` và metadata. Không lưu binary/base64 vào MySQL." |
+| "Có test case chưa?" | "Có 40 test case đặc tả ở `10-kiem-thu.md` (trong đó 5 test case Camera Check-in TC-FILE-01 đến TC-FILE-05), đã chạy manual qua Postman. Test tự động JUnit + MockMvc đưa vào giai đoạn tiếp theo." |
+| "Hạn chế hiện tại?" | "(1) Chưa có tab Thành viên — chờ API BE. (2) Chưa có dashboard thống kê quỹ. (3) Hệ thống hiện chỉ triển khai role ADMIN/MEMBER; OWNER chỉ là hướng mở rộng, chưa có trong code hiện tại. (4) Đối soát ngân hàng thủ công. (5) Danh sách ngân hàng hard-code local, chưa có API `/api/banks`. (6) Chưa có UI lịch sử tài khoản. (7) `/uploads/**` hiện public — hướng phát triển: API download có JWT. Tất cả ở mục Hướng phát triển." |
 
 ## Lỗi có thể gặp khi demo + Cách xử lý
 

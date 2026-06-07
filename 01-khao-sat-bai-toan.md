@@ -19,7 +19,7 @@ Khảo sát thực tế (qua phỏng vấn 5 ban cán sự lớp K63–K65 Khoa 
 | Theo dõi ai đã đóng | Excel / Google Sheets (thủ công) |
 | Sinh viên xác nhận đã đóng | Tin nhắn riêng cho ban cán sự |
 | Đăng ký tham gia sự kiện | Google Forms |
-| Điểm danh tham gia | Gọi tên trực tiếp / chụp ảnh điểm danh |
+| Điểm danh tham gia | Gọi tên trực tiếp / điểm danh giấy / chụp ảnh minh chứng gửi vào nhóm chat |
 | Báo cáo thu chi cuối kỳ | Excel tổng kết |
 
 ## 1.3. Vấn đề rút ra từ khảo sát
@@ -55,6 +55,11 @@ Khảo sát thực tế (qua phỏng vấn 5 ban cán sự lớp K63–K65 Khoa 
 - Đăng ký Google Forms, điểm danh giấy → không gắn 2 dữ liệu với nhau được.
 - Không trả lời được "em A trong cả năm tham gia mấy sự kiện".
 
+### 1.3.8. Minh chứng tham gia không gắn với hệ thống
+- Member chụp ảnh điểm danh gửi vào nhóm Zalo → lẫn trong hàng trăm tin nhắn.
+- Admin phải xem lại từng ảnh thủ công, không truy vết được ai đã gửi, khi nào.
+- Không có cơ chế duyệt/từ chối ảnh một cách có hệ thống.
+
 ### 1.3.7. Dễ nhầm lẫn khi xác nhận thủ công
 - Tin nhắn "em đóng rồi ạ" lẫn trong group hàng trăm tin nhắn/ngày.
 - Quên cập nhật vào Excel → đến kỳ sau lại đòi tiền nhầm.
@@ -89,7 +94,7 @@ Từ phân tích trên, hệ thống ClassHub cần đáp ứng:
 | Phân quyền theo lớp | Member chỉ thấy lớp mình, Admin chỉ quản lý lớp mình có quyền |
 | Quỹ lớp đầy đủ | Tạo khoản thu, xem nợ, xác nhận thanh toán, lịch sử |
 | Hỗ trợ QR thanh toán | Sinh QR VietQR; xác nhận bán tự động bởi admin |
-| Sự kiện + điểm danh | Tạo sự kiện, sinh viên đăng ký, admin điểm danh có/không có mặt |
+| Sự kiện + điểm danh | Tạo sự kiện, sinh viên đăng ký, admin điểm danh; Member gửi ảnh minh chứng, admin duyệt |
 | Bảo mật cơ bản | Mật khẩu mã hoá, xác thực JWT, không lộ dữ liệu lớp khác |
 | Đa nền tảng | Ứng dụng di động (Flutter) — sinh viên ai cũng có smartphone |
 

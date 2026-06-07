@@ -45,6 +45,11 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
 | Huỷ đăng ký | — | ✅ (nếu chưa check-in) | ✅ |
 | Xem danh sách người đăng ký | — | ❌ → 403 | ✅ (lớp mình) |
 | Check-in (điểm danh) | — | ❌ → 403 | ✅ (lớp mình) |
+| Gửi ảnh minh chứng điểm danh | — | ✅ (sự kiện đã đăng ký) | ✅ |
+| Gửi lại ảnh nếu bị từ chối | — | ✅ | ✅ |
+| Xem ảnh minh chứng | — | ❌ → 403 | ✅ (lớp mình) |
+| Duyệt ảnh minh chứng | — | ❌ → 403 | ✅ (lớp mình) |
+| Từ chối ảnh minh chứng | — | ❌ → 403 | ✅ (lớp mình) |
 | Xem sự kiện mình đã đăng ký | — | ✅ | ✅ |
 
 ## 3.3. Use Case Diagram (mô tả văn bản)
@@ -75,6 +80,8 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
                    │  • Đăng ký tham gia                 │
                    │  • Huỷ đăng ký                      │
                    │  • Xem sự kiện đã đăng ký           │
+                   │  • Gửi ảnh minh chứng điểm danh     │
+                   │  • Gửi lại ảnh nếu bị từ chối       │
                    │                                      │
    Admin ────────► │  Tất cả use case của Member +        │
    (≡ Member +     │                                      │
@@ -87,7 +94,10 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
                    │  Sự kiện — Quản lý:                  │
                    │  • Tạo sự kiện                      │
                    │  • Xem danh sách người đăng ký      │
-                   │  • Check-in (điểm danh)             │
+                   │  • Check-in thủ công                │
+                   │  • Xem ảnh minh chứng               │
+                   │  • Duyệt ảnh minh chứng             │
+                   │  • Từ chối ảnh minh chứng           │
                    └─────────────────────────────────────┘
 ```
 
@@ -114,7 +124,9 @@ graph TB
     UC11[Xác nhận thanh toán]
     UC12[Tạo khoản chi]
     UC13[Tạo sự kiện]
-    UC14[Check-in sự kiện]
+    UC14[Check-in thủ công]
+    UC15[Gửi ảnh minh chứng]
+    UC16[Duyệt / Từ chối ảnh]
 
     G --> UC1
     G --> UC2
@@ -126,12 +138,14 @@ graph TB
     M --> UC7
     M --> UC8
     M --> UC9
+    M --> UC15
 
     A --> UC10
     A --> UC11
     A --> UC12
     A --> UC13
     A --> UC14
+    A --> UC16
 
     A -.kế thừa.-> M
 ```
@@ -253,8 +267,10 @@ graph TB
 
 ### UC14 — Admin check-in (điểm danh)
 
-**Actor:** Admin
-**Luồng chính:**
+**Actor:** Admin  
+**Check-in có 2 luồng:**
+
+**Luồng A — Check-in thủ công (Admin tự đánh dấu):**
 1. Admin mở "Người tham gia" của 1 sự kiện.
 2. Bấm "Check-in" cạnh sinh viên A → confirm dialog.
 3. FE gọi `PUT /api/events/{eventId}/checkin/{userId}`.
@@ -263,8 +279,59 @@ graph TB
 6. BE set `checkedIn=true`, `checkedInAt=now()`, `checkedBy=admin`.
 7. FE reload, counter "Check-in: X/Y" tăng lên.
 
+**Luồng B — Admin duyệt ảnh minh chứng (xem UC16).**
+
+---
+
+### UC15 — Member gửi ảnh minh chứng điểm danh
+
+**Actor:** Member đã đăng ký sự kiện  
+**Mô tả:** Member chụp ảnh bằng camera trong app và gửi lên BE để minh chứng tự điểm danh.
+
+**Tiền điều kiện:**
+- Member đã đăng nhập, đã đăng ký sự kiện.
+- Chưa được check-in.
+- Chưa có submission PENDING.
+
+**Luồng chính:**
+1. Member bấm "Chụp ảnh điểm danh" trong tab Sự kiện.
+2. Camera mở (`ImageSource.camera`, `imageQuality: 80`, `maxWidth: 1280`).
+3. Member chụp ảnh → preview hiển thị.
+4. Member bấm "Gửi minh chứng".
+5. FE gọi `POST /api/events/{eventId}/checkin-submissions` với multipart/form-data, field `file`, `contentType: image/jpeg` hoặc `image/png`.
+6. BE validate: file không rỗng, size ≤ 5MB, contentType bắt đầu "image/", extension là jpg/jpeg/png.
+7. BE lưu file vào `classhub.upload-dir`, lưu metadata vào `event_checkin_submissions` (status=PENDING).
+8. FE chuyển UI → "Chờ ban cán sự xác nhận".
+
+**Luồng phụ:**
+- Bấm "Chụp lại" → mở lại camera.
+- Cancel camera không cần sự kiện gì (app không crash).
+- File sai định dạng → 400 "File phải là ảnh".
+- Đã có submission PENDING → 400 "Bạn đã gửi ảnh điểm danh đang chờ duyệt".
+
+---
+
+### UC16 — Admin duyệt / từ chối ảnh minh chứng
+
+**Actor:** Admin của lớp  
+**Mô tả:** Admin xem ảnh từng người gửi và quyết định duyệt hoặc từ chối.
+
+**Luồng chính — Duyệt:**
+1. Admin mở `EventParticipantsScreen`, thấy Member có trạng thái "Chờ duyệt ảnh".
+2. Admin bấm xem ảnh → ảnh tải từ `/uploads/...`.
+3. Admin bấm "Duyệt" → confirm dialog.
+4. FE gọi `PUT /api/events/checkin-submissions/{submissionId}/approve`.
+5. BE set `submission.status = APPROVED`, `EventParticipant.checkedIn = true`, `checkedInAt = now()`, `checkedBy = admin`.
+6. FE reload → Member chuyển trạng thái "Đã điểm danh".
+
+**Luồng phụ — Từ chối:**
+4a. Admin bấm "Từ chối" → nhập lý do.
+4b. FE gọi `PUT /api/events/checkin-submissions/{submissionId}/reject` với `{"reason": "..."}`.
+5b. BE set `status = REJECTED`, lưu lý do.
+6b. Member thấy trạng thái "Ảnh bị từ chối, vui lòng gửi lại" → có thể gửi lại submission mới.
+
 ## 3.6. Tổng kết
 
 - **3 actor** với phạm vi quyền tách biệt rõ ràng.
-- **23 use case** chính chia 4 nhóm: Tài khoản, Lớp, Quỹ, Sự kiện.
+- **26 use case** chính chia 4 nhóm: Tài khoản, Lớp, Quỹ, Sự kiện (trong đó 3 UC mới cho Camera Check-in).
 - Mọi use case yêu cầu quyền đều có kiểm tra **theo lớp** (không chỉ kiểm tra role toàn cục).

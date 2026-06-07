@@ -28,7 +28,7 @@ com.classhub.classhubapi/
 | `JwtAuthenticationEntryPoint.java` | Trả JSON 401 thay HTML login mặc định khi request không có token / token sai. |
 | `SecurityUtil.java` | Helper static `currentUserId()` lấy userId từ SecurityContext. |
 
-## 8.4. Package `controller` — 5 REST controller
+## 8.4. Package `controller` — 6 REST controller
 
 Mọi controller đều có:
 - `@RestController` + `@RequestMapping("/api/...")`
@@ -39,9 +39,11 @@ Mọi controller đều có:
 |---|---|---|
 | `AuthController` | `/api/auth` | 2 (register, login) |
 | `ClassroomController` | `/api/classrooms` | 3 (create, join, my) |
+| `ClassroomBankAccountController` | `/api/classrooms/{id}/bank-account` | 3 (get, upsert, history) |
 | `FundCollectionController` | `/api/fund` | 7 (collections + payments + QR + status) |
 | `FundExpenseController` | `/api/fund/expenses` | 2 (create, list) |
-| `EventController` | `/api/events` | 7 (events + volunteer + check-in) |
+| `EventController` | `/api/events` | 7 (events + volunteer + check-in thủ công) |
+| `EventCheckinSubmissionController` | `/api/events/{id}/checkin-submissions`, `/api/events/checkin-submissions/{id}` | 4 (submit, list, approve, reject) |
 
 Chi tiết: xem `07-api-documentation.md`.
 
@@ -51,9 +53,12 @@ Chi tiết: xem `07-api-documentation.md`.
 |---|---|
 | `AuthService` | register (check email unique, hash password, sinh JWT). login (verify password, sinh JWT). |
 | `ClassroomService` | createClassroom (sinh inviteCode, auto-gán ADMIN). joinClassroom (chống join trùng, **B6: backfill payment cho member join muộn**). getMyClassrooms. |
-| `FundCollectionService` | createCollection (auto-sinh payment cho all members). list + get payments. **confirmPayment (B3: lưu confirmedBy + idempotency)**. getMyPayments. generateQr (owner-only + cache paymentCode). getPaymentStatus. |
+| `ClassroomBankAccountService` | getBankAccount (lấy tài khoản active). upsertBankAccount (tạo mới hoặc đánh dấu cũ inactive, tạo bản mới active). getHistory (admin-only). |
+| `FundCollectionService` | createCollection (kiểm tra lớp có bank account active, auto-sinh payment cho all members). list + get payments. **confirmPayment (B3: lưu confirmedBy + idempotency)**. getMyPayments. **generateQr (lấy bank account active từ DB, owner-only + cache paymentCode)**. getPaymentStatus. |
 | `FundExpenseService` | createExpense (requireAdmin). list (requireMember). |
 | `EventService` | createEvent (requireAdmin). list + getMyEvents (requireMember). volunteer + cancelVolunteer (chống đăng ký trùng, chặn huỷ sau check-in). getParticipants (requireAdmin). **checkIn (B4: lưu checkedBy + idempotency)**. |
+| `FileStorageService` | **validateAndStoreFile(MultipartFile)**: kiểm tra contentType bắt đầu `"image/"`, extension thuộc `{jpg,jpeg,png}`, size ≤ 5MB. Lưu file vào `classhub.upload-dir/event-checkins/`, đặt tên `event_{id}_user_{id}_{timestamp}.{ext}`. Trả `imagePath`. |
+| `EventCheckinSubmissionService` | **submitCheckin** (requireMember, check participant, chống PENDING trùng, gọi FileStorageService, lưu Submission). **getSubmissions** (requireAdmin). **approveSubmission** (requireAdmin, set APPROVED, set checkedIn=true trên participant). **rejectSubmission** (requireAdmin, set REJECTED + lưu lý do). |
 | `AuthorizationService` | **Trung tâm phân quyền.** `requireMember(userId, classroomId)` + `requireAdmin(userId, classroomId)`. Vi phạm → `ForbiddenException`. |
 
 ### Conventions service
@@ -62,36 +67,40 @@ Chi tiết: xem `07-api-documentation.md`.
 - Mọi action có ràng buộc role/membership **bắt buộc gọi `authorizationService.requireXxx(...)` đầu method**
 - Trả về DTO (Response), không trả thẳng entity
 
-## 8.6. Package `repository` — 8 JpaRepository
+## 8.6. Package `repository` — 9 JpaRepository
 
 | Repository | Custom query method quan trọng |
 |---|---|
 | `UserRepository` | `existsByEmail`, `findByEmail` |
 | `ClassroomRepository` | `findByInviteCode`, `existsByIdAndClassroomId` |
 | `ClassMemberRepository` | `existsByUserIdAndClassroomId`, `findByUserId`, `findByClassroomId`, `findByUserIdAndClassroomId` (cho B2 authz) |
+| `ClassroomBankAccountRepository` | `findByClassroomIdAndActiveTrue`, `findByClassroomIdOrderByCreatedAtDesc` (history) |
 | `FundCollectionRepository` | `findByClassroomId`, `existsByIdAndClassroomId` |
 | `FundPaymentRepository` | `findByFundCollectionId`, `findByUserIdAndFundCollection_ClassroomId`, `existsByUserIdAndFundCollectionId`, `sumConfirmedAmountByCollectionId` (custom `@Query`) |
 | `FundExpenseRepository` | `findByClassroomId` |
 | `EventRepository` | `findByClassroomIdOrderByEventTimeDesc` |
 | `EventParticipantRepository` | `findByEventId`, `existsByEventIdAndUserId`, `findByEventIdAndUserId`, `findByUserIdAndEvent_ClassroomId` |
+| `EventCheckinSubmissionRepository` | `findByEventId`, `findByEventIdAndUserId`, `existsByEventIdAndUserIdAndStatus` (chống PENDING trùng) |
 
 **Conventions:**
 - Tận dụng **derived query method** của Spring Data JPA (`findByXxxAndYyy`) — không viết SQL/HQL thủ công.
 - Underscore `_` trong tên method để navigate qua FK (vd `findByUserIdAndFundCollection_ClassroomId`).
 - Chỉ dùng `@Query` khi cần `SUM`/aggregation.
 
-## 8.7. Package `entity` — 8 JPA entity
+## 8.7. Package `entity` — 9 JPA entity
 
 | Entity | Bảng | Quan hệ chính |
 |---|---|---|
 | `User` | `users` | (root) |
 | `Classroom` | `classrooms` | `createdBy` (Long, chưa @ManyToOne) |
 | `ClassMember` | `class_members` | `@ManyToOne User`, `@ManyToOne Classroom`, enum `Role{ADMIN,MEMBER}` |
+| `ClassroomBankAccount` | `classroom_bank_accounts` | `@ManyToOne Classroom`, `@ManyToOne User createdBy`, boolean `active` |
 | `FundCollection` | `fund_collections` | `@ManyToOne Classroom`, `@ManyToOne User createdBy` |
 | `FundPayment` | `fund_payments` | `@ManyToOne User user`, `@ManyToOne FundCollection`, **`@ManyToOne User confirmedBy` (B3)** |
 | `FundExpense` | `fund_expenses` | `@ManyToOne Classroom`, `@ManyToOne User createdBy` |
 | `Event` | `events` | `@ManyToOne Classroom`, `@ManyToOne User createdBy` |
 | `EventParticipant` | `event_participants` | `@ManyToOne Event`, `@ManyToOne User user`, **`@ManyToOne User checkedBy` (B4)** |
+| `EventCheckinSubmission` | `event_checkin_submissions` | `@ManyToOne Event`, `@ManyToOne User user`, `@ManyToOne EventParticipant participant`, **`@ManyToOne User reviewedBy`**, enum `status {PENDING, APPROVED, REJECTED}`, `imagePath`, `rejectedReason` |
 
 **Conventions:**
 - `@Entity` + `@Table(name="...")`
@@ -103,12 +112,12 @@ Chi tiết: xem `07-api-documentation.md`.
 
 ## 8.8. Package `dto`
 
-16 DTO chia 2 loại:
+18 DTO chia 2 loại + 3 DTO mới cho Camera Check-in:
 
 | Loại | File |
 |---|---|
-| Request | `RegisterRequest`, `LoginRequest`, `CreateClassroomRequest`, `JoinClassroomRequest`, `CreateCollectionRequest`, `CreateExpenseRequest`, `CreateEventRequest` |
-| Response | `AuthResponse`, `ClassroomResponse`, `CollectionResponse`, `PaymentResponse`, `PaymentStatusResponse`, `QrResponse`, `ExpenseResponse`, `EventResponse`, `EventParticipantResponse` |
+| Request | `RegisterRequest`, `LoginRequest`, `CreateClassroomRequest`, `JoinClassroomRequest`, `UpdateClassroomBankAccountRequest`, `CreateCollectionRequest`, `CreateExpenseRequest`, `CreateEventRequest`, `RejectCheckinRequest` |
+| Response | `AuthResponse`, `ClassroomResponse`, `ClassroomBankAccountResponse`, `CollectionResponse`, `PaymentResponse`, `PaymentStatusResponse`, `QrResponse`, `ExpenseResponse`, `EventResponse`, `EventParticipantResponse`, `EventCheckinSubmissionResponse` |
 
 **Conventions:**
 - Request có `@NotBlank`/`@NotNull`/`@Email`/`@DecimalMin` cho validation.
@@ -134,7 +143,7 @@ spring.datasource.password=ClassHub@2026
 
 # JPA
 spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
+spring.jpa.show-sql=false                # Tắt SQL logging để không log số tài khoản
 
 # Server
 server.port=8080
@@ -143,10 +152,11 @@ server.port=8080
 jwt.secret=classhub-super-secret-key-2026-do-an-tot-nghiep-spring-boot-flutter
 jwt.expiration=86400000   # 24h
 
-# VietQR — Cần đổi TK thật trước demo
-vietqr.bank-bin=970415
-vietqr.account-no=109875610620
-vietqr.account-name=Nguyen Duy Phong
+# VietQR — Không còn dùng config cố định
+# Tài khoản nhận tiền lấy từ DB table classroom_bank_accounts
+# vietqr.bank-bin=970415
+# vietqr.account-no=109875610620
+# vietqr.account-name=Nguyen Duy Phong
 vietqr.template=compact2
 ```
 
@@ -228,7 +238,7 @@ vietqr.template=compact2
 
 ```
 $ ./mvnw clean compile
-[INFO] Compiling 52 source files
+[INFO] Compiling 58 source files
 [INFO] BUILD SUCCESS
 ```
 
@@ -241,7 +251,7 @@ Xem chi tiết: `classhub-api/documents/PROJECT_STATUS.md`. Tóm tắt:
 | Mức | Việc |
 |---|---|
 | 🔴 Phải làm trước demo | API `/classrooms/{id}/members`, API thống kê quỹ |
-| 🟡 Nên có | `@Future` cho deadline/eventTime; `Event.endTime`; API edit/delete; Test case TC01–TC20 |
+| 🟡 Nên có | `@Future` cho deadline/eventTime; `Event.endTime`; API edit/delete; Test case TC01–TC35 |
 | 🟢 Hướng phát triển | Role OWNER, `EventParticipant.type`/`attendanceStatus`, notification, refresh token, đối soát ngân hàng |
 
 ## 8.16. Trả lời câu hỏi điển hình
@@ -253,4 +263,6 @@ Xem chi tiết: `classhub-api/documents/PROJECT_STATUS.md`. Tóm tắt:
 | "Phân quyền chỗ nào?" | Trong từng service, gọi `AuthorizationService.requireMember/requireAdmin` đầu method. Filter chỉ authenticate, không authorize. |
 | "Tại sao role không nằm ở User?" | Vì 1 user có thể tham gia nhiều lớp với role khác nhau. Role thuộc cặp (user, classroom) → đặt ở `ClassMember`. |
 | "DB đổi thì sao?" | Đổi `application.properties` (URL, user, password). Hibernate `ddl-auto=update` tự sinh schema. |
-| "Test thế nào?" | Hiện có file `ClasshubApiApplicationTests` rỗng. Test case TC01–TC20 nằm trong `10-kiem-thu.md`, sẽ implement bằng MockMvc trong giai đoạn tiếp theo. |
+| "Test thế nào?" | Hiện có file `ClasshubApiApplicationTests` rỗng. Test case TC01–TC40 nằm trong `10-kiem-thu.md`, sẽ implement bằng MockMvc trong giai đoạn tiếp theo. |
+| "File ảnh lưu ở đâu?" | `D:/big_dream/classhub-uploads/event-checkins/` (ngoài repo). Cấu hình bằng `classhub.upload-dir` trong `application.properties`. DB chỉ lưu `image_path` và metadata. |
+| "`/uploads/**` có bảo mật không?" | Hiện public cho MVP/demo (`WebMvcConfig.addResourceHandlers`). Hướng phát triển: API download có JWT. |

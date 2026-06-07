@@ -274,7 +274,108 @@ sequenceDiagram
     end
 ```
 
-## 5.7. Tổng kết
+## 5.7. Camera Check-in: Member gửi ảnh minh chứng
+
+```mermaid
+sequenceDiagram
+    actor M as Member
+    participant F as Flutter
+    participant EC as EventCheckinSubmissionController
+    participant ES as EventCheckinSubmissionService
+    participant FS as FileStorageService
+    participant EPR as EventParticipantRepo
+    participant ECSR as EventCheckinSubmissionRepo
+    participant DB as MySQL
+    participant Disk as FileSystem
+
+    M->>F: Bấm "Chụp ảnh điểm danh"
+    F->>F: ImagePicker.getImage(source: camera, quality: 80)
+    F->>F: Hiển thị preview ảnh
+    M->>F: Bấm "Gửi minh chứng"
+
+    F->>EC: POST /api/events/{eventId}/checkin-submissions (multipart/form-data, field=file, contentType=image/jpeg)
+    EC->>ES: submitCheckin(eventId, userId, multipartFile)
+
+    ES->>EPR: findByEventIdAndUserId(eventId, userId)
+    EPR->>DB: SELECT
+    DB-->>EPR: participant
+
+    alt participant == null
+        ES-->>EC: BadRequestException("Синх viên chưa đăng ký sự kiện này")
+        EC-->>F: 400
+    else participant.checkedIn == true
+        ES-->>EC: BadRequestException("Đã điểm danh rồi")
+        EC-->>F: 400
+    else có submission PENDING
+        ES-->>EC: BadRequestException("Đang chờ duyệt")
+        EC-->>F: 400
+    else OK
+        ES->>FS: validateAndStoreFile(file)
+        FS->>FS: check contentType starts with "image/"
+        FS->>FS: check extension jpg/jpeg/png
+        FS->>FS: check size <= 5MB
+        FS->>Disk: write file to upload-dir/event-checkins/
+        Disk-->>FS: image_path
+        FS-->>ES: image_path
+
+        ES->>ECSR: save(new Submission{PENDING, submitted_at=now})
+        ECSR->>DB: INSERT INTO event_checkin_submissions
+
+        ES-->>EC: SubmissionResponse{id, status=PENDING}
+        EC-->>F: 200 OK
+        F->>M: Hiển thị "Chờ ban cán sự xác nhận"
+    end
+```
+
+## 5.8. Camera Check-in: Admin duyệt / từ chối ảnh
+
+```mermaid
+sequenceDiagram
+    actor A as Admin
+    participant F as Flutter
+    participant EC as EventCheckinSubmissionController
+    participant ES as EventCheckinSubmissionService
+    participant AS as AuthorizationService
+    participant ECSR as EventCheckinSubmissionRepo
+    participant EPR as EventParticipantRepo
+    participant UR as UserRepo
+    participant DB as MySQL
+
+    A->>F: Mở EventParticipantsScreen → thấy "Chờ duyệt ảnh"
+    A->>F: Xem ảnh (load từ /uploads/...)
+
+    alt Admin bấm "Duyệt"
+        F->>F: Confirm dialog
+        A->>F: Xác nhận
+        F->>EC: PUT /api/events/checkin-submissions/{submissionId}/approve
+        EC->>ES: approveSubmission(submissionId, adminId)
+
+        ES->>ECSR: findById(submissionId)
+        ECSR-->>ES: submission
+
+        ES->>AS: requireAdmin(adminId, event.classroomId)
+        AS-->>ES: OK
+
+        ES->>ECSR: save(submission.status=APPROVED, reviewedBy=admin, reviewedAt=now)
+        ES->>EPR: save(participant.checkedIn=true, checkedInAt=now, checkedBy=admin)
+        EPR->>DB: UPDATE event_participants
+
+        ES-->>EC: SubmissionResponse{status=APPROVED}
+        EC-->>F: 200 OK
+        F->>A: Reload → Member chuyển "Đã điểm danh"
+    else Admin bấm "Từ chối"
+        F->>F: Dialog nhập lý do
+        A->>F: Nhập lý do + xác nhận
+        F->>EC: PUT /api/events/checkin-submissions/{submissionId}/reject {reason}
+        EC->>ES: rejectSubmission(submissionId, adminId, reason)
+        ES->>ECSR: save(status=REJECTED, rejectedReason=reason, reviewedBy=admin)
+        ES-->>EC: SubmissionResponse{status=REJECTED}
+        EC-->>F: 200 OK
+        F->>A: Reload → Member thấy "Ảnh bị từ chối, gửi lại"
+    end
+```
+
+## 5.9. Tổng kết
 
 | Sequence | Tính nghiệp vụ chính được thể hiện |
 |---|---|
@@ -283,7 +384,9 @@ sequenceDiagram
 | 5.3 Xác nhận thanh toán | Idempotency check; lưu confirmedBy |
 | 5.4 QR + polling | Owner-only check; 5s polling; dispose timer |
 | 5.5 Volunteer | requireMember; chống đăng ký trùng |
-| 5.6 Check-in | requireAdmin; idempotency; lưu checkedBy |
+| 5.6 Check-in thủ công | requireAdmin; idempotency; lưu checkedBy |
+| 5.7 Camera Check-in (gửi ảnh) | Multipart upload; validate contentType; FileStorageService; chống submit trùng |
+| 5.8 Duyệt/Từ chối ảnh | requireAdmin; approve → set checkedIn; reject → lưu lý do; Member gửi lại được |
 
 **Điểm chung của mọi sequence:**
 - Mọi request (trừ /auth) đều đi qua `JwtAuthenticationFilter`.

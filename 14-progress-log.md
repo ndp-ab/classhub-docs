@@ -178,6 +178,84 @@ về Home khi muốn chuyển workspace.
 
 **Kiểm tra:** `flutter analyze` → passed.
 
+## Giai đoạn 8.5 — Tài khoản ngân hàng theo lớp (2026-06-05)
+
+Thêm tính năng tài khoản ngân hàng cấu hình theo từng lớp, QR động lấy từ DB thay vì dùng tài khoản cố định.
+
+### Backend
+| Việc | Trạng thái |
+|---|---|
+| Thêm entity `ClassroomBankAccount` (9 entity) | ✅ |
+| Thêm repository `ClassroomBankAccountRepository` | ✅ |
+| Thêm service `ClassroomBankAccountService` (getBankAccount, upsert, getHistory) | ✅ |
+| Thêm controller `ClassroomBankAccountController` | ✅ |
+| Thêm DTO `UpdateClassroomBankAccountRequest`, `ClassroomBankAccountResponse` | ✅ |
+| Cập nhật `FundCollectionService.createCollection()` kiểm tra bank account | ✅ |
+| Cập nhật `FundCollectionService.generateQr()` lấy bank account từ DB | ✅ |
+| Tắt SQL logging (`spring.jpa.show-sql=false`) | ✅ |
+| Comment config tài khoản cố định trong `application.properties` | ✅ |
+
+### Frontend
+| Việc | Trạng thái |
+|---|---|
+| Thêm model `ClassroomBankAccount` | ✅ |
+| Thêm constants `lib/core/constants/vietnam_banks.dart` (20 ngân hàng) | ✅ |
+| Thêm màn `ClassroomBankAccountScreen` với bottom sheet search ngân hàng | ✅ |
+| Cập nhật `ClassroomService`: thêm `getBankAccount`, `updateBankAccount` | ✅ |
+| Cập nhật `FundTab`: card tài khoản nhận tiền ở đầu tab | ✅ |
+| Cập nhật `PaymentQrScreen`: hiển thị block tài khoản nhận tiền | ✅ |
+| Confirmation dialog trước khi lưu tài khoản | ✅ |
+| Ẩn Bank BIN khỏi UI, user chỉ chọn ngân hàng từ list | ✅ |
+
+### Validation & Testing
+| Việc | Trạng thái |
+|---|---|
+| Backend compile: `./mvnw clean compile` → BUILD SUCCESS | ✅ |
+| Frontend analyze: `flutter analyze` → No issues found | ✅ |
+| Cập nhật tài liệu (8 file .md) | ✅ |
+
+**Phạm vi:** BE thêm 3 API mới (GET/PUT/GET history), FE thêm 1 màn + 1 constants file + cập nhật 2 màn hiện có.
+
+**Hướng phát triển:** API `/api/banks` dynamic, logo ngân hàng, UI lịch sử tài khoản, unique constraint DB cho (classroom_id, active=true).
+
+## Giai đoạn 8.6 — Camera Check-in (2026-06-07)
+
+Thêm chức năng chụp ảnh minh chứng điểm danh sự kiện.
+
+### Backend
+| Việc | Trạng thái |
+|---|---|
+| Thêm entity `EventCheckinSubmission` (10 entity) | ✅ |
+| Thêm repository `EventCheckinSubmissionRepository` | ✅ |
+| Thêm service `FileStorageService` (validate contentType/extension/size, lưu file) | ✅ |
+| Thêm service `EventCheckinSubmissionService` (submit, list, approve, reject) | ✅ |
+| Thêm controller `EventCheckinSubmissionController` (4 endpoint) | ✅ |
+| Thêm DTO `EventCheckinSubmissionResponse`, `RejectCheckinRequest` | ✅ |
+| Cấu hình `classhub.upload-dir` trong `application.properties` | ✅ |
+| `WebMvcConfig.addResourceHandlers` expose `/uploads/**` | ✅ |
+
+### Frontend
+| Việc | Trạng thái |
+|---|---|
+| Thêm dependency `image_picker`, `http_parser`, `path` vào `pubspec.yaml` | ✅ |
+| Thêm màn `checkin_submission_screen.dart` | ✅ |
+| Cập nhật `event_service.dart`: thêm `submitCheckinImage` với `contentType: MediaType('image', ext)` | ✅ |
+| Cập nhật `events_tab.dart`: nút "Chụp ảnh điểm danh" cho Member đã đăng ký | ✅ |
+| Cập nhật `event_participants_screen.dart`: hiển thị trạng thái + xem ảnh + duyệt/từ chối | ✅ |
+
+### Bug debug
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| FE: "File phải là ảnh" dù đã chụp ảnh | `MultipartFile.fromPath` không set `contentType` → BE nhận `null`/`octet-stream` | Thêm `contentType: MediaType('image', ext)` — `http_parser` package |
+
+### Validation & Testing
+| Việc | Trạng thái |
+|---|---|
+| Backend compile: `./mvnw clean compile` → BUILD SUCCESS (58 file) | ✅ |
+| Frontend analyze: `flutter analyze` → No issues found | ✅ |
+| Deploy APK trên Xiaomi HyperOS | ✅ |
+| Test E2E trên Android device thật | ⚠️ Cần kiểm thử |
+
 ## Giai đoạn 7 — Bổ sung trước demo (kế hoạch)
 
 | Việc | Ưu tiên | Effort |
@@ -188,7 +266,7 @@ về Home khi muốn chuyển workspace.
 | FE Dashboard quỹ (widget tổng quan) | 🟡 | 1-2 tiếng |
 | Smoke test BE bằng Postman | 🔴 | 15 phút |
 | Test E2E 13 bước demo trên 2 thiết bị | 🔴 | 30 phút |
-| Đổi `vietqr.account-no` thành TK thật | 🔴 | 1 phút |
+| Đổi `vietqr.account-no` thành TK thật | ~~đã obsolete: config cố định đã bị comment ra từ giai đoạn 8.5~~ | — |
 | `@Future` validate deadline/eventTime | 🟡 | 5 phút |
 | API edit/delete collection/event/expense | 🟢 | 1 tiếng |
 | Test case JUnit + MockMvc | 🟢 | 3-4 tiếng |
@@ -205,22 +283,24 @@ Tuần 7:          Polish UX + Documentation
 2026-05-31:      Refactor HomeScreen thành class selector
 2026-06-01:      Điều chỉnh ClassroomDetailScreen workspace
 2026-06-03:      Classroom switcher sheet trong workspace
-Trước demo:      API members + statistics + smoke test
+2026-06-05:      Tài khoản ngân hàng theo lớp
+2026-06-07:      Camera Check-in (ảnh minh chứng điểm danh)
+Trước demo:      API members + statistics + smoke test + test E2E Camera Check-in trên device
 ```
 
 ## Số liệu thống kê
 
 | Hạng mục | Số |
 |---|---|
-| File source BE (Java) | 52 |
-| File source FE (Dart) | ~22 |
-| Endpoint REST | 21 |
-| Bảng DB | 8 |
-| Screen Flutter | 13 |
+| File source BE (Java) | 58 |
+| File source FE (Dart) | ~26 |
+| Endpoint REST | 28 |
+| Bảng DB | 10 |
+| Screen Flutter | 14 (Camera Check-in là inline UI trong EventsTab + EventParticipantsScreen, không có màn độc lập mới) |
 | File documentation | 14 |
-| Test case đặc tả | 28 |
-| Bug critical đã fix | 9 (B1–B8 + freeze CollectionPaymentsScreen) |
-| Tổng thời gian phát triển | ~7 tuần + 2 ngày design system polish |
+| Test case đặc tả | 40 |
+| Bug critical đã fix | 10 (B1–B8 + freeze CollectionPaymentsScreen + Camera Check-in contentType) |
+| Tổng thời gian phát triển | ~7 tuần + 2 ngày design system polish + 1 ngày bank account feature + 1 ngày camera check-in |
 
 ## Bài học rút ra
 
