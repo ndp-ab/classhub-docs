@@ -66,7 +66,7 @@ classhub_app/
 
 ## 9.4. Danh sách màn hình
 
-Tổng **14 màn hình** chia 3 nhóm:
+Tổng **15 màn hình** chia 3 nhóm:
 
 ### 9.4.1. Auth (2 màn)
 | File | Mô tả |
@@ -82,8 +82,11 @@ Tổng **14 màn hình** chia 3 nhóm:
 | `screens/join_classroom_screen.dart` | Input invite code, gọi `joinClassroom`. |
 | `screens/classroom_switcher_sheet.dart` | Bottom sheet đổi lớp trong workspace. Load danh sách lớp bằng `ClassroomService.getMyClassrooms(...)`, chọn lớp khác thì trả classroom data cho màn hiện tại. |
 | `screens/classroom_bank_account_screen.dart` | **Mới (2026-06-05)**: Form cấu hình tài khoản ngân hàng nhận tiền của lớp. Chỉ Admin. Chọn ngân hàng từ bottom sheet search (20 ngân hàng VN hard-code), nhập số TK/chủ TK/ghi chú. Confirmation dialog trước khi lưu. |
+| `screens/notification_screen.dart` | **Mới (2026-06-09)**: Inbox thông báo in-app của user. Tap item hiện chỉ đánh dấu đã đọc, chưa điều hướng sâu sang lớp/tab/đối tượng liên quan. Nút "Đánh dấu tất cả đã đọc". Dot badge đỏ cho thông báo chưa đọc. Pull-to-refresh. Loading/empty/error state. |
 
 `HomeScreen` chỉ đóng vai trò chọn lớp để tiếp tục làm việc, không phải dashboard tổng. Dashboard/nghiệp vụ theo từng lớp nằm ở `ClassroomDetailScreen` và các tab con.
+
+> **Header HomeScreen** hiển thị icon chuông với **badge số thông báo chưa đọc**. Tap icon chuông → mở `NotificationScreen`. Số unread được load khi `initState` và refresh sau khi quay lại từ `NotificationScreen`. Đây là in-app notification inbox, không phải push notification ngoài màn hình điện thoại.
 
 ### 9.4.3. Chi tiết lớp + 3 phân hệ (7 màn)
 
@@ -157,15 +160,23 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - **`submitCheckinImage(eventId, imagePath, userId)`** → `POST /api/events/{eventId}/checkin-submissions` với `http.MultipartFile.fromPath('file', imagePath, contentType: MediaType('image', ext))` — **bắt buộc set `contentType`** để BE validate đúng.
 - **`getCheckinSubmissions(eventId) / approveSubmission(submissionId) / rejectSubmission(submissionId, reason)`**
 
+### `services/notification_service.dart` (4 method)
+- Dùng `AppConfig.baseUrl`, đọc token `jwt_token` từ `SharedPreferences`, gửi `Authorization: Bearer <token>`.
+- **`getNotifications({page, size})`** → `GET /api/notifications` — trả `List<AppNotification>`, parse Spring Page dạng `{ content: [...] }` từ response.
+- **`getUnreadCount()`** → `GET /api/notifications/unread-count` — trả `int`.
+- **`markAsRead(recipientId)`** → `PUT /api/notifications/{recipientId}/read`.
+- **`markAllAsRead()`** → `PUT /api/notifications/read-all`.
+
 ### Conventions service
 - Helper `_headers(userId, {json:true})` build header (Bearer + Content-Type nếu POST).
 - Helper `_errorMessage(response)` chuyển status 4xx/5xx thành string Vietnamese.
-- Mọi method trả `Future<Map<String, dynamic>>` shape:
+- Các service nghiệp vụ cũ chủ yếu trả `Future<Map<String, dynamic>>` shape:
   ```dart
   {success: true, data: <model>}
   // hoặc
   {success: false, message: "..."}
   ```
+- Riêng `NotificationService` trả typed value trực tiếp (`List<AppNotification>`, `int`, `void`) và throw `Exception` khi lỗi để `NotificationScreen` hiển thị loading/error state.
 - Try/catch quanh `http.xxx` để bắt lỗi network.
 
 ### Role helper FE
@@ -195,6 +206,7 @@ nữa, mà dùng `UserRoles.isAdminLike(...)`. Backend hiện chỉ có `ADMIN`/
 | `models/payment.dart` | `Payment` | `PaymentResponse` (parse cả `amount`, `deadline`, `confirmedByName`) |
 | `models/expense.dart` | `Expense` | `ExpenseResponse` |
 | `models/event.dart` | `ClassEvent` + `EventParticipant` | `EventResponse` + `EventParticipantResponse` (có `eventId`, `checkedByName`) |
+| `models/app_notification.dart` | `AppNotification` | `NotificationResponse` (parse `recipientId`, `notificationId`, `classroomId`, `type`, `title`, `message`, `targetType`, `targetId`, `isRead`/`read`, `readAt`, `createdAt`, `createdByName`) |
 
 Conventions:
 - Trường nullable đúng theo BE (`String?`, `int?`).
@@ -256,6 +268,8 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 | `EventsTab` | `GET /api/events/{classroomId}` + `GET /api/events/my/{classroomId}` + `POST /volunteer` / `DELETE /volunteer` + **`POST /checkin-submissions`** (upload ảnh inline) |
 | `CreateEventScreen` | `POST /api/events` |
 | `EventParticipantsScreen` | `GET /api/events/{eventId}/participants` + `PUT /checkin/{userId}` + **`GET /checkin-submissions`** + **`PUT /checkin-submissions/{id}/approve`** + **`PUT /checkin-submissions/{id}/reject`** |
+| `NotificationScreen` | `GET /api/notifications` + `PUT /api/notifications/{recipientId}/read` + `PUT /api/notifications/read-all` |
+| `HomeScreen` (badge) | `GET /api/notifications/unread-count` khi `initState` và sau khi quay lại từ `NotificationScreen` |
 
 ## 9.12. Luồng điều hướng
 
@@ -263,6 +277,8 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 Splash (main → AuthWrapper)
    │
    ├─ token có trong prefs → HomeScreen
+   │       │
+   │       ├─ Tap icon chuông → NotificationScreen (load list, tap item chỉ mark read)
    │       │
    │       ├─ Tap card lớp → ClassroomDetailScreen
    │       │       │
@@ -310,10 +326,18 @@ Mỗi màn có data load đều dùng shared widgets ở `lib/core/widgets/`:
 
 ### HomeScreen class selector
 Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace selector:
-- Header gồm title `ClassHub`, icon thông báo, greeting `Xin chào, {fullName}` và subtitle `Chọn lớp để tiếp tục quản lý`.
+- Header gồm title `ClassHub`, icon thông báo in-app kèm badge unread, greeting `Xin chào, {fullName}` và subtitle `Chọn lớp để tiếp tục quản lý`.
 - Quick actions dùng shared button: `Tạo lớp` và `Nhập mã lớp`.
 - Section `Lớp học của bạn` hiển thị danh sách classroom cards.
 - Mỗi card dùng `AppCard`, hiển thị className, faculty/academicYear, role badge Admin/Member, invite code và chevron để thể hiện có thể bấm.
+
+### NotificationScreen
+`NotificationScreen` là inbox in-app notification:
+- Load danh sách bằng `NotificationService.getNotifications(page: 0, size: 20)`.
+- Có `AppLoading`, `AppErrorState`, `AppEmptyState` và pull-to-refresh.
+- Thông báo chưa đọc hiển thị dot badge đỏ; tap item gọi `markAsRead(recipientId)` và cập nhật state local.
+- Nút "Đánh dấu tất cả đã đọc" gọi `markAllAsRead()` và set toàn bộ item trong list sang đã đọc.
+- MVP hiện chưa deep-link theo `targetType/targetId` sang tab/lớp/khoản thu/sự kiện.
 
 ### ClassroomDetailScreen workspace
 `ClassroomDetailScreen` là workspace theo lớp sau khi chọn lớp:
@@ -423,6 +447,11 @@ flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
 | 9 | **Chưa có UI lịch sử tài khoản ngân hàng** | FE thêm màn history sau khi BE có API `/api/classrooms/{id}/bank-account/history` |
 | 10 | **Camera Check-in đã implement; cần kiểm thử thực tế trên Android device thật** | Chạy bằng `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` và test luồng chụp ảnh → upload → duyệt |
 | 11 | **`/uploads/**` hiện public — ảnh minh chứng ai cũng xem được qua URL** | Hướng phát triển: API download có JWT + phân quyền theo lớp |
+| 12 | **Notification hiện là in-app inbox, chưa có Firebase FCM/push notification ngoài app** | Thêm device token + FCM khi cần push nền/ngoài màn hình điện thoại |
+| 13 | **Chưa có reminder/scheduler trước giờ sự kiện** | Thêm job scheduler và notification type riêng |
+| 14 | **Chưa có notification theo lớp riêng trong `ClassroomDetailScreen` hoặc filter API theo `classroomId`** | BE thêm filter, FE thêm entry point theo workspace lớp |
+| 15 | **Tap notification hiện chỉ mark read, chưa điều hướng sâu theo `targetType/targetId`** | FE map target sang màn/tab tương ứng khi cần deep-link |
+| 16 | **Chưa có user notification settings, device token hoặc delivery logs** | Thêm khi triển khai push notification/notification preferences |
 
 ## 9.17. Trạng thái build
 

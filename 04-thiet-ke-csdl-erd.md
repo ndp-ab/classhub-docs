@@ -2,7 +2,7 @@
 
 ## 4.1. Tổng quan
 
-ClassHub sử dụng **MySQL 8** với **10 bảng**. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
+ClassHub sử dụng **MySQL 8** với **12 bảng**. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
 
 Database: `classhub_db` (charset `utf8mb4`).
 
@@ -20,6 +20,8 @@ Database: `classhub_db` (charset `utf8mb4`).
 | 8 | `event_participants` | Sinh viên đăng ký + check-in sự kiện | 7 |
 | 9 | `classroom_bank_accounts` | Tài khoản ngân hàng nhận tiền theo lớp | 10 |
 | 10 | `event_checkin_submissions` | Ảnh minh chứng điểm danh sự kiện | 13 |
+| 11 | `notifications` | Thông báo in-app (tiêu đề, nội dung, loại, đối tượng liên quan) | 8 |
+| 12 | `notification_recipients` | Quan hệ thông báo ↔ người nhận + trạng thái đã đọc | 5 |
 
 ## 4.3. Sơ đồ ERD (Mermaid)
 
@@ -34,12 +36,15 @@ erDiagram
     USERS ||--o{ EVENT_PARTICIPANTS : "đăng ký"
     USERS ||--o{ EVENT_PARTICIPANTS : "check-in (admin)"
     USERS ||--o{ CLASSROOM_BANK_ACCOUNTS : "cấu hình"
+    USERS ||--o{ NOTIFICATIONS : "tạo"
+    USERS ||--o{ NOTIFICATION_RECIPIENTS : "nhận"
 
     CLASSROOMS ||--o{ CLASS_MEMBERS : "có"
     CLASSROOMS ||--o{ FUND_COLLECTIONS : "có"
     CLASSROOMS ||--o{ FUND_EXPENSES : "có"
     CLASSROOMS ||--o{ EVENTS : "có"
     CLASSROOMS ||--o{ CLASSROOM_BANK_ACCOUNTS : "có tài khoản nhận tiền"
+    CLASSROOMS ||--o{ NOTIFICATIONS : "có thông báo"
 
     FUND_COLLECTIONS ||--o{ FUND_PAYMENTS : "sinh ra"
     EVENTS ||--o{ EVENT_PARTICIPANTS : "có"
@@ -47,6 +52,7 @@ erDiagram
     EVENT_PARTICIPANTS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "từ participant"
     USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "gửi ảnh (user)"
     USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "duyệt (reviewed_by)"
+    NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : "gửi đến"
 
     USERS {
         bigint id PK
@@ -155,6 +161,27 @@ erDiagram
         bigint reviewed_by FK
         datetime reviewed_at
         varchar rejected_reason
+    }
+
+    NOTIFICATIONS {
+        bigint id PK
+        bigint classroom_id FK
+        enum type "COLLECTION_CREATED|EVENT_CREATED|..."
+        varchar title
+        text message
+        enum target_type "FUND_COLLECTION|EVENT|..."
+        bigint target_id
+        bigint created_by FK
+        datetime created_at
+    }
+
+    NOTIFICATION_RECIPIENTS {
+        bigint id PK
+        bigint notification_id FK
+        bigint user_id FK
+        boolean is_read
+        datetime read_at
+        datetime created_at
     }
 ```
 
@@ -337,6 +364,10 @@ UNIQUE KEY (event_id, user_id)
 | User 1 — n EventCheckinSubmission (reviewedBy) | 1-n | | Admin duyệt/từ chối |
 | Classroom 1 — n ClassroomBankAccount | 1-n | | Một lớp có nhiều tài khoản qua lịch sử (chỉ 1 active tại 1 thời điểm) |
 | User 1 — n ClassroomBankAccount (createdBy) | 1-n | | Admin cấu hình tài khoản |
+| Classroom 1 — n Notification | 1-n | | Một lớp có nhiều thông báo in-app liên quan đến nghiệp vụ của lớp |
+| User 1 — n Notification (createdBy) | 1-n | | User/admin tạo hành động nghiệp vụ sinh thông báo |
+| Notification 1 — n NotificationRecipient | 1-n | | Một thông báo gốc được fan-out đến nhiều người nhận |
+| User 1 — n NotificationRecipient | 1-n | | Một user có nhiều notification recipient, mỗi recipient có trạng thái đọc riêng |
 
 ## 4.6. Quyết định thiết kế quan trọng
 
@@ -353,6 +384,8 @@ UNIQUE KEY (event_id, user_id)
 | `/uploads/**` có bảo mật không? | Hiện public cho MVP/demo | Hướng phát triển: API download có JWT + phân quyền theo lớp/sự kiện |
 | Timezone | `Asia/Ho_Chi_Minh` trong JDBC URL | Đảm bảo timestamp đúng giờ Việt Nam |
 | Tài khoản ngân hàng | Tách bảng riêng, giữ history bằng active flag | Hỗ trợ mỗi lớp có tài khoản riêng; QR động theo lớp; admin có thể đổi tài khoản mà vẫn truy vết được lịch sử |
+| Trạng thái đọc notification | Lưu ở `notification_recipients`, không lưu ở `notifications` | Mỗi user đọc thông báo ở thời điểm khác nhau; cùng một nội dung notification có thể gửi cho nhiều người |
+| Điều hướng notification | `target_type` + `target_id` là FK ngầm | MVP hiện dùng để lưu đối tượng liên quan; sau này FE có thể dùng để deep-link đến sự kiện/khoản thu |
 
 ## 4.7. Script tạo DB (rút gọn)
 
@@ -382,11 +415,50 @@ Schema còn lại do **Hibernate `ddl-auto=update`** tự sinh khi khởi độn
 | `reviewed_at` | DATETIME | NULL | Thời điểm duyệt |
 | `rejected_reason` | VARCHAR(500) | NULL | Lý do từ chối |
 
-## 4.9. Tổng kết
+## 4.9. Mô tả chi tiết bảng `notifications` và `notification_recipients`
 
-- **10 bảng** đầy đủ cho 3 phân hệ + tài khoản ngân hàng động + ảnh minh chứng check-in.
+### `notifications` — Thông báo
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
+| `classroom_id` | BIGINT | FK → classrooms.id, NULL | Lớp liên quan (NULL = thông báo hệ thống) |
+| `type` | ENUM | NOT NULL | `COLLECTION_CREATED`, `PAYMENT_CONFIRMED`, `EVENT_CREATED`, `CHECKIN_SUBMITTED`, `CHECKIN_APPROVED`, `CHECKIN_REJECTED` |
+| `title` | VARCHAR(255) | NOT NULL | Tiêu đề ngắn, vd "Có khoản thu mới" |
+| `message` | TEXT | NOT NULL | Nội dung đầy đủ |
+| `target_type` | ENUM | NULL | Loại đối tượng liên quan: `FUND_COLLECTION`, `EVENT`, ... |
+| `target_id` | BIGINT | NULL | ID đối tượng liên quan (FK ngầm) |
+| `created_by` | BIGINT | FK → users.id, NULL | Admin tạo thông báo |
+| `created_at` | DATETIME | NOT NULL, auto | Thời điểm tạo |
+
+### `notification_recipients` — Người nhận thông báo
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
+| `notification_id` | BIGINT | FK → notifications.id, NOT NULL | Thông báo |
+| `user_id` | BIGINT | FK → users.id, NOT NULL | Người nhận |
+| `is_read` | BOOLEAN | NOT NULL DEFAULT FALSE | Đã đọc chưa |
+| `read_at` | DATETIME | NULL | Thời điểm đọc |
+| `created_at` | DATETIME | NOT NULL, auto | Thời điểm gửi |
+
+**Ràng buộc:**
+```sql
+UNIQUE KEY (notification_id, user_id)
+```
+→ Một user không nhận 2 bản sao cùng 1 thông báo.
+
+**Lý do thiết kế:**
+- Tách bảng `notifications` (nội dung) và `notification_recipients` (ai nhận, đã đọc chưa) → 1 thông báo gửi được cho nhiều người mà không trùng lập dữ liệu.
+- `target_id` là FK ngầm (không có constraint DB) → linh hoạt cho nhiều `targetType` khác nhau mà không cần join table phức tạp.
+- `REQUIRES_NEW` trong `NotificationService.createNotification()` tách transaction ghi notification khỏi transaction nghiệp vụ gọi nó. MVP hiện vẫn gọi đồng bộ, chưa có queue/retry riêng.
+
+## 4.10. Tổng kết
+
+- **12 bảng** đầy đủ cho 3 phân hệ + tài khoản ngân hàng động + ảnh minh chứng check-in + thông báo in-app.
 - Quan hệ n-n giữa User và Classroom giải quyết qua bảng `class_members` — đây là điểm "đúng OOAD" nhất của thiết kế.
 - Audit trail (`confirmed_by`, `checked_by`, `created_by` ở bank account, `reviewed_by` ở submission) đảm bảo truy vết được mọi hành động.
 - Sử dụng các kiểu dữ liệu phù hợp: BigDecimal cho tiền, LocalDate cho hạn, LocalDateTime cho timestamp.
 - **Tài khoản ngân hàng theo lớp** giải quyết bài toán mỗi lớp có quỹ riêng, QR thanh toán động, và giữ lịch sử thay đổi.
 - **Ảnh minh chứng** lưu ngoài DB (file system), DB chỉ lưu path + metadata — tránh phình MySQL và dễ scale storage.
+- **Thông báo in-app** thiết kế fan-out: 1 notification → N recipient records. FE polling `unread-count` khi vào HomeScreen, hiển thị badge số chưa đọc trên icon chuông.

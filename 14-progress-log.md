@@ -11,7 +11,7 @@
 | Tổng hợp vấn đề thực tế (Zalo + Excel + Forms rời rạc) | ✅ |
 | Định nghĩa 3 phân hệ chính (Auth/Quỹ/Sự kiện) | ✅ |
 | Đăng ký đề tài + đề cương | ✅ |
-| Thiết kế ERD (10 bảng — cập nhật theo quá trình phát triển) | ✅ |
+| Thiết kế ERD (12 bảng — cập nhật theo quá trình phát triển) | ✅ |
 | Xác định 3 actor (Guest/Member/Admin) | ✅ |
 | Lập danh sách 21 endpoint dự kiến | ✅ |
 | Use Case Diagram | ✅ (text-based + Mermaid) |
@@ -22,7 +22,7 @@
 | Việc | Trạng thái |
 |---|---|
 | Setup Spring Boot project + MySQL | ✅ |
-| 10 entity + repository (tăng dần theo các giai đoạn) | ✅ |
+| Entity + repository chính (tăng dần theo các giai đoạn, hiện có notification MVP) | ✅ |
 | Auth: register/login + BCrypt + JWT generation | ✅ |
 | Classroom: create/join/list | ✅ |
 | Fund collections + payments + auto-sinh | ✅ |
@@ -255,6 +255,40 @@ Thêm chức năng chụp ảnh minh chứng điểm danh sự kiện.
 | Deploy APK trên Xiaomi HyperOS | ✅ |
 | Test E2E trên Android device thật | ⚠️ Cần kiểm thử |
 
+## Giai đoạn 8.7 — In-app Notification MVP (2026-06-09)
+
+Hoàn thành MVP thông báo **in-app**: backend sinh notification theo nghiệp vụ, frontend có inbox thông báo và badge unread ở `HomeScreen`.
+
+### Backend
+| Việc | Trạng thái |
+|---|---|
+| Thêm entity `Notification`, `NotificationRecipient` | ✅ |
+| Thêm enum `NotificationType`, `NotificationTargetType` | ✅ |
+| Thêm repository `NotificationRepository`, `NotificationRecipientRepository` | ✅ |
+| Thêm DTO `NotificationResponse`, `UnreadCountResponse` | ✅ |
+| Thêm `NotificationService`: list, unread-count, mark-read, mark-all-read, createNotification | ✅ |
+| Thêm `NotificationController` prefix `/api/notifications` với 4 endpoint | ✅ |
+| Dùng `SecurityUtil.currentUserId()`, không nhận `userId` từ client | ✅ |
+| `markAsRead` dùng `recipientId + currentUserId` để chặn đọc/sửa recipient của user khác | ✅ |
+| `createNotification(...)` dùng `REQUIRES_NEW` transaction | ✅ |
+
+### Frontend
+| Việc | Trạng thái |
+|---|---|
+| Thêm model `AppNotification` | ✅ |
+| Thêm `NotificationService` gọi 4 API notification bằng JWT token | ✅ |
+| Thêm `NotificationScreen` với loading/error/empty/list, pull-to-refresh, tap item mark read | ✅ |
+| Thêm nút "Đánh dấu tất cả đã đọc" | ✅ |
+| Cập nhật `HomeScreen`: icon chuông + badge unread, refresh count sau khi quay lại từ `NotificationScreen` | ✅ |
+
+### Auto emit
+| Luồng | Trạng thái |
+|---|---|
+| Admin tạo sự kiện → member trong lớp nhận `EVENT_CREATED`, trừ người tạo | ✅ |
+| Admin tạo khoản thu → member trong lớp nhận `COLLECTION_CREATED`, trừ người tạo | ✅ |
+
+**Phạm vi chưa làm:** Chưa có Firebase FCM, push notification ngoài app, reminder/scheduler trước giờ sự kiện, notification theo lớp riêng trong `ClassroomDetailScreen`, filter API theo `classroomId`, user notification settings, device token hoặc delivery logs. Tap notification hiện chỉ mark read, chưa deep-link sang lớp/tab/khoản thu/sự kiện.
+
 ## Giai đoạn 7 — Bổ sung trước demo (kế hoạch)
 
 | Việc | Ưu tiên | Effort |
@@ -284,6 +318,7 @@ Tuần 7:          Polish UX + Documentation
 2026-06-03:      Classroom switcher sheet trong workspace
 2026-06-05:      Tài khoản ngân hàng theo lớp
 2026-06-07:      Camera Check-in (ảnh minh chứng điểm danh)
+2026-06-09:      In-app Notification MVP (inbox + unread badge)
 Trước demo:      API members + statistics + smoke test + test E2E Camera Check-in trên device
 ```
 
@@ -291,15 +326,15 @@ Trước demo:      API members + statistics + smoke test + test E2E Camera Chec
 
 | Hạng mục | Số |
 |---|---|
-| File source BE (Java) | 58 |
-| File source FE (Dart) | ~26 |
-| Endpoint REST | 28 |
-| Bảng DB | 10 |
-| Screen Flutter | 14 (Camera Check-in là inline UI trong EventsTab + EventParticipantsScreen, không có màn độc lập mới) |
+| File source BE (Java) | ~78 |
+| File source FE (Dart) | ~50 |
+| Endpoint REST | 32 |
+| Bảng DB | 12 |
+| Screen Flutter | 15 (Camera Check-in là inline UI; Notification có `NotificationScreen` riêng) |
 | File documentation | 14 |
-| Test case đặc tả | 40 |
+| Test case đặc tả | 53 |
 | Bug critical đã fix | 10 (B1–B8 + freeze CollectionPaymentsScreen + Camera Check-in contentType) |
-| Tổng thời gian phát triển | ~7 tuần + 2 ngày design system polish + 1 ngày bank account feature + 1 ngày camera check-in |
+| Tổng thời gian phát triển | ~7 tuần + 2 ngày design system polish + 1 ngày bank account feature + 1 ngày camera check-in + 1 ngày notification MVP |
 
 ## Bài học rút ra
 

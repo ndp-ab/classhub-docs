@@ -1,6 +1,6 @@
 # 07 — API Documentation
 
-Tài liệu mô tả **28 endpoint** REST của ClassHub Backend.
+Tài liệu mô tả **32 endpoint** REST của ClassHub Backend.
 
 **Base URL:** `http://localhost:8080/api` (đổi theo môi trường)
 **Auth:** mọi endpoint trừ `/api/auth/**` yêu cầu header:
@@ -539,7 +539,84 @@ Admin từ chối ảnh minh chứng kèm lý do. **Chỉ Admin**.
 
 ---
 
-## 7.9. Bảng tổng hợp
+## 7.9. Thông báo — `/api/notifications`
+
+> Hệ thống thông báo in-app. Notification được tạo tự động bởi server khi có sự kiện nghiệp vụ (tạo khoản thu, tạo sự kiện). Client polling hoặc load khi mở màn.
+
+**Auth:** yêu cầu JWT như các endpoint `/api/**` khác. Client **không truyền `userId`** trong query/body/path; server luôn lấy user hiện tại từ token qua `SecurityUtil.currentUserId()`. Không có endpoint dạng `/users/{userId}/notifications`.
+
+### GET /api/notifications
+Lấy danh sách thông báo của user hiện tại (phân trang, mới nhất trước).
+
+**Query params:** `page` (default 0), `size` (default 20).
+
+**Response 200:** `Page<NotificationResponse>`
+```json
+{
+  "content": [
+    {
+      "recipientId": 55,
+      "notificationId": 30,
+      "classroomId": 12,
+      "type": "COLLECTION_CREATED",
+      "title": "Có khoản thu mới",
+      "message": "Lớp 64KTPM3 vừa tạo khoản thu: Quỹ lớp tháng 6",
+      "targetType": "FUND_COLLECTION",
+      "targetId": 42,
+      "isRead": false,
+      "readAt": null,
+      "createdAt": "2026-06-09T10:00:00",
+      "createdByName": "Admin A"
+    }
+  ],
+  "totalElements": 5,
+  "totalPages": 1,
+  "size": 20,
+  "number": 0
+}
+```
+
+**Enum `type`:**
+| Giá trị | Khi nào sinh |
+|---|---|
+| `COLLECTION_CREATED` | Admin tạo khoản thu mới |
+| `EVENT_CREATED` | Admin tạo sự kiện mới |
+| `PAYMENT_CONFIRMED` | Admin xác nhận đóng tiền *(reserved — chưa trigger)* |
+| `CHECKIN_SUBMITTED` | Member gửi ảnh điểm danh *(reserved)* |
+| `CHECKIN_APPROVED` | Admin duyệt ảnh *(reserved)* |
+| `CHECKIN_REJECTED` | Admin từ chối ảnh *(reserved)* |
+
+**Enum `targetType`:** `CLASSROOM`, `FUND_COLLECTION`, `FUND_PAYMENT`, `EVENT`, `CHECKIN_SUBMISSION`.
+
+### GET /api/notifications/unread-count
+Lấy số thông báo chưa đọc.
+
+**Response 200:**
+```json
+{ "count": 3 }
+```
+
+### PUT /api/notifications/{recipientId}/read
+Đánh dấu 1 thông báo đã đọc. **Chỉ chủ recipient** (`recipientId` thuộc user hiện tại).
+
+**Request body:** rỗng.
+**Response 200:** `NotificationResponse` đã cập nhật (`isRead=true`, `readAt` được set).
+**Lỗi:** 403 nếu `recipientId` không thuộc user.
+
+### PUT /api/notifications/read-all
+Đánh dấu toàn bộ thông báo chưa đọc là đã đọc.
+
+**Request body:** rỗng.
+**Response 200:** `{ "count": 0 }`
+
+### Phạm vi MVP hiện tại
+- Đã có inbox thông báo **in-app** và badge unread ở Flutter `HomeScreen`.
+- Đã tự sinh notification khi admin tạo sự kiện (`EVENT_CREATED`) hoặc tạo khoản thu (`COLLECTION_CREATED`), gửi cho member trong lớp và loại trừ người tạo.
+- Chưa có Firebase FCM, push notification ngoài app, device token, delivery logs, reminder/scheduler, filter API theo `classroomId`, user notification settings, hoặc thông báo theo lớp riêng trong `ClassroomDetailScreen`.
+
+---
+
+## 7.10. Bảng tổng hợp
 
 | # | Method | Endpoint | Quyền | Mục đích |
 |---|---|---|---|---|
@@ -572,10 +649,14 @@ Admin từ chối ảnh minh chứng kèm lý do. **Chỉ Admin**.
 | 26 | GET | `/api/events/{eventId}/checkin-submissions` | Admin lớp | Xem danh sách submission của sự kiện |
 | 27 | PUT | `/api/events/checkin-submissions/{submissionId}/approve` | Admin lớp | Duyệt ảnh → xác nhận check-in |
 | 28 | PUT | `/api/events/checkin-submissions/{submissionId}/reject` | Admin lớp | Từ chối ảnh kèm lý do |
+| 29 | GET | `/api/notifications` | Authenticated | Lấy danh sách thông báo (phân trang) |
+| 30 | GET | `/api/notifications/unread-count` | Authenticated | Số thông báo chưa đọc |
+| 31 | PUT | `/api/notifications/{recipientId}/read` | Owner | Đánh dấu 1 thông báo đã đọc |
+| 32 | PUT | `/api/notifications/read-all` | Authenticated | Đánh dấu tất cả đã đọc |
 
-**Tổng: 28 endpoint** chia 6 nhóm (Auth 2 / Classroom 3 / Classroom Bank Account 3 / Fund 10 / Event 7 / Camera Check-in 4).
+**Tổng: 32 endpoint** chia 7 nhóm (Auth 2 / Classroom 3 / Classroom Bank Account 3 / Fund 10 / Event 7 / Camera Check-in 4 / Notification 4).
 
-## 7.9. Status code summary
+## 7.11. Status code summary
 
 | Code | Số chỗ dùng | Trường hợp |
 |---|---|---|
@@ -586,7 +667,7 @@ Admin từ chối ảnh minh chứng kèm lý do. **Chỉ Admin**.
 | 403 Forbidden | nhiều | Không có quyền (authz fail) |
 | 500 Internal Server Error | fallback | Lỗi server không lường trước |
 
-## 7.10. Postman Collection
+## 7.12. Postman Collection
 
 > **TODO:** Export Postman collection `.json` để bàn giao cùng tài liệu. Hiện tại có thể test qua cURL hoặc Postman GUI từng request.
 

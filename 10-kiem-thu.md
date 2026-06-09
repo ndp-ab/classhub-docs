@@ -5,13 +5,13 @@
 | Loại test | Trạng thái | Ghi chú |
 |---|---|---|
 | Manual test (Postman + Flutter) | ✅ Đã làm theo demo script | Xem `12-demo-script.md` |
-| Test case TC01–TC35 đặc tả | ✅ Đã liệt kê dưới | |
+| Test case TC01–TC53 đặc tả | ✅ Đã liệt kê dưới | |
 | Test case tự động (JUnit + MockMvc) | 🟡 Chưa implement | Sẽ làm trong giai đoạn tiếp theo |
 | Test trên thiết bị thật | ⚠️ Cần test trước demo | Chạy FE với `--dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
 
-## 10.2. Bảng test case TC01–TC35
+## 10.2. Bảng test case TC01–TC53
 
-Test case bao phủ 5 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Event.
+Test case bao phủ 7 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Event, Camera Check-in, Notification.
 
 | Mã TC | Module | Chức năng | Điều kiện | Kết quả mong đợi | Status |
 |---|---|---|---|---|---|
@@ -55,8 +55,21 @@ Test case bao phủ 5 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Even
 | TC-FILE-03 | Camera Check-in | Admin duyệt ảnh PENDING | submission.status=PENDING | 200, set APPROVED, set EventParticipant.checkedIn=true | ⬜ |
 | TC-FILE-04 | Camera Check-in | Admin từ chối ảnh kèm lý do | submission.status=PENDING | 200, set REJECTED, lưu rejectedReason | ⬜ |
 | TC-FILE-05 | Camera Check-in | Member gửi lại ảnh sau khi bị từ chối | submission REJECTED, member gửi mới | 200, tạo submission PENDING mới | ⬜ |
+| TC-NOTI-01 | Notification | Lấy danh sách thông báo | User đã đăng nhập, có notification recipient | `GET /api/notifications?page=0&size=20` trả `Page` có `content`, chỉ notification của user hiện tại | ⬜ |
+| TC-NOTI-02 | Notification | Đếm unread count | User có N recipient `is_read=false` | `GET /api/notifications/unread-count` trả `{ "count": N }` | ⬜ |
+| TC-NOTI-03 | Notification | Mark one as read | Recipient thuộc user hiện tại, `is_read=false` | `PUT /api/notifications/{recipientId}/read` trả `isRead=true`, DB set `read_at` | ⬜ |
+| TC-NOTI-04 | Notification | Mark all as read | User có nhiều notification chưa đọc | `PUT /api/notifications/read-all` trả `{ "count": 0 }`, tất cả recipient của user được set read | ⬜ |
+| TC-NOTI-05 | Notification | Admin tạo event → member nhận notification | Admin lớp tạo sự kiện mới | Member trong lớp nhận `EVENT_CREATED`, `targetType=EVENT`, `targetId=event.id` | ⬜ |
+| TC-NOTI-06 | Notification | Admin tạo khoản thu → member nhận notification | Admin lớp tạo khoản thu mới | Member trong lớp nhận `COLLECTION_CREATED`, `targetType=FUND_COLLECTION`, `targetId=collection.id` | ⬜ |
+| TC-NOTI-07 | Notification | Người tạo không nhận notification của chính mình | Admin tạo event/khoản thu | Không tạo `NotificationRecipient` cho user tạo nghiệp vụ | ⬜ |
+| TC-NOTI-08 | Notification Security | User không đọc/sửa recipient của user khác | User A gọi `PUT /api/notifications/{recipientIdOfUserB}/read` | 403, recipient của user B không đổi trạng thái | ⬜ |
+| TC-NOTI-09 | FE Notification | Home badge hiển thị đúng | User có unread count > 0 | `HomeScreen` hiển thị badge số chưa đọc trên icon chuông; quay lại từ `NotificationScreen` thì refresh count | ⬜ |
+| TC-NOTI-10 | FE Notification | NotificationScreen hiển thị list/empty/error/loading | Mock/API trả đủ 4 trạng thái | UI dùng loading, empty state, error state và list item đúng dữ liệu | ⬜ |
+| TC-NOTI-11 | FE Notification | Pull refresh | Đang ở `NotificationScreen` | Kéo refresh gọi lại `GET /api/notifications`, list cập nhật | ⬜ |
+| TC-NOTI-12 | FE Notification | Tap item mark read | Item đang unread | Tap item gọi mark read, dot unread biến mất, không điều hướng sâu | ⬜ |
+| TC-NOTI-13 | FE Notification | Mark all read | Có ít nhất 1 item unread | Bấm "Đánh dấu tất cả đã đọc" gọi API, toàn bộ item chuyển sang read | ⬜ |
 
-**Tổng: 40 test case** (thêm 5 test case cho Camera Check-in).
+**Tổng: 53 test case** (thêm 5 test case cho Camera Check-in và 13 test case cho Notification MVP).
 
 ## 10.3. Bộ dữ liệu test
 
@@ -191,12 +204,23 @@ Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự 
 - Thiết bị 2: đăng nhập Member, mở `PaymentQrScreen` (đang polling).
 - Trên thiết bị 1, bấm Xác nhận → trong ≤ 5s thiết bị 2 chuyển trạng thái.
 
-### 10.6.4. Flutter widget test (chưa làm)
+### 10.6.4. Test NotificationScreen và Home badge
+Điều kiện: lớp K64KTPM3 có admin và ít nhất 1 member.
+
+1. Đăng nhập Admin, tạo sự kiện hoặc khoản thu mới.
+2. Đăng nhập Member, quay về `HomeScreen`, kiểm tra icon chuông có badge unread.
+3. Tap icon chuông, kiểm tra `NotificationScreen` hiển thị item mới.
+4. Tap item, kiểm tra dot unread biến mất.
+5. Quay lại `HomeScreen`, kiểm tra badge được refresh.
+6. Tạo thêm nhiều notification, mở lại `NotificationScreen`, bấm "Đánh dấu tất cả đã đọc" và kiểm tra badge về 0.
+
+### 10.6.5. Flutter widget test (chưa làm)
 Có thể viết widget test cho:
 - `LoginScreen` render đủ 2 field + nút submit.
 - `HomeScreen` hiển thị "Chưa tham gia lớp nào" khi list rỗng.
 - `ClassroomBankAccountScreen` validation không cho submit khi chưa chọn ngân hàng.
 - Bottom sheet search ngân hàng filter đúng khi gõ.
+- `NotificationScreen` render loading/empty/error/list và cập nhật dot unread sau khi mark read.
 
 → Đưa vào hướng phát triển.
 
@@ -226,8 +250,9 @@ Có thể viết widget test cho:
 
 ## 10.9. Tổng kết kiểm thử
 
-- **40 test case đặc tả** bao phủ 6 module (thêm 5 test case cho Camera Check-in), 4 loại HTTP status (200, 400, 401, 403).
+- **53 test case đặc tả** bao phủ 7 module (thêm 5 test case cho Camera Check-in và 13 test case cho Notification MVP), 4 loại HTTP status (200, 400, 401, 403).
 - **Manual test** đã chạy luồng E2E qua demo script (BE compile + FE pub get sạch).
 - **Camera Check-in** (đặc biệt TC-FILE-01 đến TC-FILE-05): đã implement BE+FE, build/analyze pass; **cần kiểm thử thực tế trên Android device** cho luồng chụp ảnh → upload → duyệt/từ chối.
+- **Notification MVP** (TC-NOTI-01 đến TC-NOTI-13): tập trung vào inbox in-app, unread count, mark read, mark all read, auto emit khi tạo event/khoản thu và ownership security.
 - **Test tự động** chưa implement — đưa vào kế hoạch giai đoạn tiếp theo.
 - **Bug history**: 8 bug critical đã fix toàn bộ trong audit B1–B8 + bug Camera Check-in `contentType` (FE đã thêm `MediaType` khi upload multipart).

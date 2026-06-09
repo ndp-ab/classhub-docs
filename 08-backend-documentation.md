@@ -28,7 +28,7 @@ com.classhub.classhubapi/
 | `JwtAuthenticationEntryPoint.java` | Trả JSON 401 thay HTML login mặc định khi request không có token / token sai. |
 | `SecurityUtil.java` | Helper static `currentUserId()` lấy userId từ SecurityContext. |
 
-## 8.4. Package `controller` — 6 REST controller
+## 8.4. Package `controller` — 8 REST controller
 
 Mọi controller đều có:
 - `@RestController` + `@RequestMapping("/api/...")`
@@ -44,6 +44,7 @@ Mọi controller đều có:
 | `FundExpenseController` | `/api/fund/expenses` | 2 (create, list) |
 | `EventController` | `/api/events` | 7 (events + volunteer + check-in thủ công) |
 | `EventCheckinSubmissionController` | `/api/events/{id}/checkin-submissions`, `/api/events/checkin-submissions/{id}` | 4 (submit, list, approve, reject) |
+| `NotificationController` | `/api/notifications` | 4 (list, unread-count, mark-read, mark-all-read) |
 
 Chi tiết: xem `07-api-documentation.md`.
 
@@ -54,12 +55,24 @@ Chi tiết: xem `07-api-documentation.md`.
 | `AuthService` | register (check email unique, hash password, sinh JWT). login (verify password, sinh JWT). |
 | `ClassroomService` | createClassroom (sinh inviteCode, auto-gán ADMIN). joinClassroom (chống join trùng, **B6: backfill payment cho member join muộn**). getMyClassrooms. |
 | `ClassroomBankAccountService` | getBankAccount (lấy tài khoản active). upsertBankAccount (tạo mới hoặc đánh dấu cũ inactive, tạo bản mới active). getHistory (admin-only). |
-| `FundCollectionService` | createCollection (kiểm tra lớp có bank account active, auto-sinh payment cho all members). list + get payments. **confirmPayment (B3: lưu confirmedBy + idempotency)**. getMyPayments. **generateQr (lấy bank account active từ DB, owner-only + cache paymentCode)**. getPaymentStatus. |
+| `FundCollectionService` | createCollection (kiểm tra lớp có bank account active, auto-sinh payment cho all members, **gửi notification COLLECTION_CREATED cho member trong lớp, trừ người tạo**). list + get payments. **confirmPayment (B3: lưu confirmedBy + idempotency)**. getMyPayments. **generateQr (lấy bank account active từ DB, owner-only + cache paymentCode)**. getPaymentStatus. |
 | `FundExpenseService` | createExpense (requireAdmin). list (requireMember). |
-| `EventService` | createEvent (requireAdmin). list + getMyEvents (requireMember). volunteer + cancelVolunteer (chống đăng ký trùng, chặn huỷ sau check-in). getParticipants (requireAdmin). **checkIn (B4: lưu checkedBy + idempotency)**. |
+| `EventService` | createEvent (requireAdmin, **gửi notification EVENT_CREATED cho member trong lớp, trừ người tạo**). list + getMyEvents (requireMember). volunteer + cancelVolunteer (chống đăng ký trùng, chặn huỷ sau check-in). getParticipants (requireAdmin). **checkIn (B4: lưu checkedBy + idempotency)**. |
 | `FileStorageService` | **validateAndStoreFile(MultipartFile)**: kiểm tra contentType bắt đầu `"image/"`, extension thuộc `{jpg,jpeg,png}`, size ≤ 5MB. Lưu file vào `classhub.upload-dir/event-checkins/`, đặt tên `event_{id}_user_{id}_{timestamp}.{ext}`. Trả `imagePath`. |
 | `EventCheckinSubmissionService` | **submitCheckin** (requireMember, check participant, chống PENDING trùng, gọi FileStorageService, lưu Submission). **getSubmissions** (requireAdmin). **approveSubmission** (requireAdmin, set APPROVED, set checkedIn=true trên participant). **rejectSubmission** (requireAdmin, set REJECTED + lưu lý do). |
+| `NotificationService` | **getMyNotifications** (phân trang theo userId, mới nhất trước). **getUnreadCount** (đếm recipient.read=false). **markAsRead** (set read=true + readAt, chỉ chủ recipient). **markAllAsRead** (bulk update tất cả unread). **createNotification** (internal — tạo Notification + NotificationRecipient cho danh sách userId, dùng `REQUIRES_NEW` transaction). |
 | `AuthorizationService` | **Trung tâm phân quyền.** `requireMember(userId, classroomId)` + `requireAdmin(userId, classroomId)`. Vi phạm → `ForbiddenException`. |
+
+### Luồng NotificationService
+- `NotificationController` có prefix `/api/notifications`, tất cả endpoint yêu cầu JWT và lấy user bằng `SecurityUtil.currentUserId()`.
+- `GET /api/notifications?page=0&size=20` gọi `getMyNotifications(userId, pageable)`, query `NotificationRecipientRepository.findByUserIdOrderByCreatedAtDesc(...)`, trả `Page<NotificationResponse>`.
+- `GET /api/notifications/unread-count` gọi `countByUserIdAndReadFalse(userId)`, trả `UnreadCountResponse { count }`.
+- `PUT /api/notifications/{recipientId}/read` gọi `findByIdAndUserId(recipientId, userId)`. Nếu recipient không thuộc user hiện tại thì trả `ForbiddenException`; nếu chưa đọc thì set `read=true`, `readAt=now`.
+- `PUT /api/notifications/read-all` lấy toàn bộ recipient chưa đọc của user hiện tại bằng `findByUserIdAndReadFalse(userId)`, set `read=true`, `readAt=now`, trả count còn lại bằng 0.
+- `createNotification(...)` là method internal, nhận `classroomId`, `type`, `title`, `message`, `targetType`, `targetId`, `createdByUserId`, `recipientUserIds`; method lọc `null`, `distinct`, kiểm tra user tồn tại rồi tạo 1 `Notification` và nhiều `NotificationRecipient`.
+- `EventService.createEvent(...)` emit `EVENT_CREATED`, `targetType=EVENT`, `targetId=event.id`, gửi cho member trong lớp trừ người tạo.
+- `FundCollectionService.createCollection(...)` emit `COLLECTION_CREATED`, `targetType=FUND_COLLECTION`, `targetId=collection.id`, gửi cho member trong lớp trừ người tạo.
+- `createNotification(...)` dùng `@Transactional(propagation = Propagation.REQUIRES_NEW)` để tách transaction ghi notification khỏi transaction nghiệp vụ gọi nó. MVP hiện gọi đồng bộ, chưa có queue/retry riêng và chưa emit các loại `PAYMENT_CONFIRMED`, `CHECKIN_SUBMITTED`, `CHECKIN_APPROVED`, `CHECKIN_REJECTED`.
 
 ### Conventions service
 - `@Service` + `@RequiredArgsConstructor`
@@ -67,7 +80,7 @@ Chi tiết: xem `07-api-documentation.md`.
 - Mọi action có ràng buộc role/membership **bắt buộc gọi `authorizationService.requireXxx(...)` đầu method**
 - Trả về DTO (Response), không trả thẳng entity
 
-## 8.6. Package `repository` — 9 JpaRepository
+## 8.6. Package `repository` — 11 JpaRepository
 
 | Repository | Custom query method quan trọng |
 |---|---|
@@ -81,13 +94,15 @@ Chi tiết: xem `07-api-documentation.md`.
 | `EventRepository` | `findByClassroomIdOrderByEventTimeDesc` |
 | `EventParticipantRepository` | `findByEventId`, `existsByEventIdAndUserId`, `findByEventIdAndUserId`, `findByUserIdAndEvent_ClassroomId` |
 | `EventCheckinSubmissionRepository` | `findByEventId`, `findByEventIdAndUserId`, `existsByEventIdAndUserIdAndStatus` (chống PENDING trùng) |
+| `NotificationRepository` | (CRUD cơ bản — Spring Data JPA) |
+| `NotificationRecipientRepository` | `findByUserIdOrderByCreatedAtDesc` (phân trang), `countByUserIdAndReadFalse`, `findByIdAndUserId` (ownership check), `findByUserIdAndReadFalse` (bulk mark-read) |
 
 **Conventions:**
 - Tận dụng **derived query method** của Spring Data JPA (`findByXxxAndYyy`) — không viết SQL/HQL thủ công.
 - Underscore `_` trong tên method để navigate qua FK (vd `findByUserIdAndFundCollection_ClassroomId`).
 - Chỉ dùng `@Query` khi cần `SUM`/aggregation.
 
-## 8.7. Package `entity` — 9 JPA entity
+## 8.7. Package `entity` — 11 JPA entity + 4 enum
 
 | Entity | Bảng | Quan hệ chính |
 |---|---|---|
@@ -101,6 +116,14 @@ Chi tiết: xem `07-api-documentation.md`.
 | `Event` | `events` | `@ManyToOne Classroom`, `@ManyToOne User createdBy` |
 | `EventParticipant` | `event_participants` | `@ManyToOne Event`, `@ManyToOne User user`, **`@ManyToOne User checkedBy` (B4)** |
 | `EventCheckinSubmission` | `event_checkin_submissions` | `@ManyToOne Event`, `@ManyToOne User user`, `@ManyToOne EventParticipant participant`, **`@ManyToOne User reviewedBy`**, enum `status {PENDING, APPROVED, REJECTED}`, `imagePath`, `rejectedReason` |
+| `Notification` | `notifications` | `@ManyToOne Classroom`, `@ManyToOne User createdBy`, enum `type`, enum `targetType`, `targetId` (FK ngầm đến đối tượng liên quan) |
+| `NotificationRecipient` | `notification_recipients` | `@ManyToOne Notification`, `@ManyToOne User`, boolean `read`, `readAt`. UNIQUE(notification_id, user_id). |
+
+**Enum phụ:**
+| Enum | Giá trị |
+|---|---|
+| `NotificationType` | `COLLECTION_CREATED`, `PAYMENT_CONFIRMED`, `EVENT_CREATED`, `CHECKIN_SUBMITTED`, `CHECKIN_APPROVED`, `CHECKIN_REJECTED` |
+| `NotificationTargetType` | `CLASSROOM`, `FUND_COLLECTION`, `FUND_PAYMENT`, `EVENT`, `CHECKIN_SUBMISSION` |
 
 **Conventions:**
 - `@Entity` + `@Table(name="...")`
@@ -112,12 +135,16 @@ Chi tiết: xem `07-api-documentation.md`.
 
 ## 8.8. Package `dto`
 
-18 DTO chia 2 loại + 3 DTO mới cho Camera Check-in:
+23 DTO chia 2 loại + 3 DTO Camera Check-in + 2 DTO Notification:
 
 | Loại | File |
 |---|---|
-| Request | `RegisterRequest`, `LoginRequest`, `CreateClassroomRequest`, `JoinClassroomRequest`, `UpdateClassroomBankAccountRequest`, `CreateCollectionRequest`, `CreateExpenseRequest`, `CreateEventRequest`, `RejectCheckinRequest` |
-| Response | `AuthResponse`, `ClassroomResponse`, `ClassroomBankAccountResponse`, `CollectionResponse`, `PaymentResponse`, `PaymentStatusResponse`, `QrResponse`, `ExpenseResponse`, `EventResponse`, `EventParticipantResponse`, `EventCheckinSubmissionResponse` |
+| Request | `RegisterRequest`, `LoginRequest`, `CreateClassroomRequest`, `JoinClassroomRequest`, `UpdateClassroomBankAccountRequest`, `CreateCollectionRequest`, `CreateExpenseRequest`, `CreateEventRequest`, `RejectCheckinSubmissionRequest` |
+| Response | `AuthResponse`, `ClassroomResponse`, `ClassMemberResponse`, `ClassroomBankAccountResponse`, `CollectionResponse`, `PaymentResponse`, `PaymentStatusResponse`, `QrResponse`, `ExpenseResponse`, `EventResponse`, `EventParticipantResponse`, `EventCheckinSubmissionResponse`, `NotificationResponse`, `UnreadCountResponse` |
+
+**`NotificationResponse` fields:** `recipientId`, `notificationId`, `classroomId`, `type` (enum), `title`, `message`, `targetType` (enum), `targetId`, `isRead`, `readAt`, `createdAt`, `createdByName`.
+
+**`UnreadCountResponse` fields:** `count` (long).
 
 **Conventions:**
 - Request có `@NotBlank`/`@NotNull`/`@Email`/`@DecimalMin` cho validation.
@@ -252,7 +279,9 @@ Xem chi tiết: `classhub-api/documents/PROJECT_STATUS.md`. Tóm tắt:
 |---|---|
 | 🔴 Phải làm trước demo | API `/classrooms/{id}/members`, API thống kê quỹ |
 | 🟡 Nên có | `@Future` cho deadline/eventTime; `Event.endTime`; API edit/delete; Test case TC01–TC35 |
-| 🟢 Hướng phát triển | Role OWNER, `EventParticipant.type`/`attendanceStatus`, notification, refresh token, đối soát ngân hàng |
+| 🟢 Hướng phát triển | Role OWNER, `EventParticipant.type`/`attendanceStatus`, notification push (Firebase FCM), reminder/scheduler, notification theo lớp riêng trong `ClassroomDetailScreen`, user notification settings, refresh token, đối soát ngân hàng |
+
+> **Notification in-app đã implement** (polling từ FE). Notification push qua Firebase FCM là hướng mở rộng sau.
 
 ## 8.16. Trả lời câu hỏi điển hình
 
@@ -266,3 +295,4 @@ Xem chi tiết: `classhub-api/documents/PROJECT_STATUS.md`. Tóm tắt:
 | "Test thế nào?" | Hiện có file `ClasshubApiApplicationTests` rỗng. Test case TC01–TC40 nằm trong `10-kiem-thu.md`, sẽ implement bằng MockMvc trong giai đoạn tiếp theo. |
 | "File ảnh lưu ở đâu?" | `D:/big_dream/classhub-uploads/event-checkins/` (ngoài repo). Cấu hình bằng `classhub.upload-dir` trong `application.properties`. DB chỉ lưu `image_path` và metadata. |
 | "`/uploads/**` có bảo mật không?" | Hiện public cho MVP/demo (`WebMvcConfig.addResourceHandlers`). Hướng phát triển: API download có JWT. |
+| "Notification hoạt động kiểu gì?" | In-app notification dùng polling (FE chủ động gọi `GET /api/notifications/unread-count` khi vào `HomeScreen` và load inbox ở `NotificationScreen`). Khi admin tạo khoản thu / tạo sự kiện, service nghiệp vụ gọi `NotificationService.createNotification()` để sinh notification cho member trong lớp, trừ người tạo. Method này dùng `REQUIRES_NEW` propagation để tách transaction ghi notification. Không dùng WebSocket, Firebase FCM hay push notification ngoài app ở giai đoạn hiện tại. |
