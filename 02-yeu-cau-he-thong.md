@@ -42,7 +42,7 @@
 ### FR-5. Quản lý sự kiện
 | Mã | Chức năng | Actor |
 |---|---|---|
-| FR-5.1 | Tạo sự kiện (title, description, location, eventTime) | Admin |
+| FR-5.1 | Tạo sự kiện (title, description, location, eventTime, số người tối thiểu cần tham gia nếu có) | Admin |
 | FR-5.2 | Xem danh sách sự kiện của lớp | Member của lớp |
 | FR-5.3 | Sinh viên xung phong tham gia | Member |
 | FR-5.4 | Hệ thống chặn đăng ký trùng | Hệ thống |
@@ -58,6 +58,11 @@
 | FR-5.14 | Admin duyệt ảnh minh chứng để xác nhận check-in | Admin của lớp |
 | FR-5.15 | Admin từ chối ảnh minh chứng kèm lý do | Admin của lớp |
 | FR-5.16 | Member được gửi lại ảnh nếu submission bị từ chối | Member |
+| FR-5.17 | Hệ thống hiển thị tiến độ tham gia so với số lượng tối thiểu (`minParticipants`) | Member/Admin của lớp |
+| FR-5.18 | Admin xem chi tiết sự kiện để biết đã đủ/chưa đủ số người tối thiểu | Admin của lớp |
+| FR-5.19 | Admin thêm/chỉ định thành viên lớp tham gia nếu sự kiện chưa đủ người | Admin của lớp |
+| FR-5.20 | Hệ thống phân biệt người tự đăng ký (`VOLUNTEER`) và người được BCS thêm (`ASSIGNED`) | Hệ thống |
+| FR-5.21 | Người được BCS thêm vào danh sách tham gia không được tự huỷ tham gia | Hệ thống |
 
 ## 2.2. Yêu cầu phi chức năng (Non-functional Requirements)
 
@@ -66,12 +71,12 @@
 |---|---|---|
 | NFR-1.1 | Mật khẩu mã hoá bằng BCrypt trước khi lưu DB | ✅ |
 | NFR-1.2 | Authentication bằng JWT (HS256, hạn 24h) | ✅ |
-| NFR-1.3 | Mọi API trừ /api/auth/** yêu cầu Bearer token | ✅ |
+| NFR-1.3 | Mọi API trừ `/api/auth/**` và `GET /api/banks` yêu cầu Bearer token | ✅ |
 | NFR-1.4 | API trả 401 JSON khi token thiếu/sai (không trả HTML login form) | ✅ |
 | NFR-1.5 | Authorization theo lớp: user chỉ truy cập dữ liệu lớp mình | ✅ |
 | NFR-1.6 | Member không gọi được API của Admin → trả 403 | ✅ |
 | NFR-1.7 | DTO không chứa password hash trong response | ✅ |
-| NFR-1.8 | Audit trail: lưu ai xác nhận thanh toán, ai check-in | ✅ |
+| NFR-1.8 | Audit trail: lưu ai xác nhận thanh toán, ai check-in, ai thêm/chỉ định participant và thời điểm thêm | ✅ |
 
 ### NFR-2. Validation
 | Mã | Yêu cầu | Trạng thái |
@@ -82,6 +87,7 @@
 | NFR-2.4 | Số tiền khoản thu/chi phải > 0 | ✅ `@DecimalMin("0.01")` |
 | NFR-2.5 | Tiêu đề khoản thu/chi/sự kiện không rỗng | ✅ `@NotBlank` |
 | NFR-2.6 | Mã mời lớp phải tồn tại khi join | ✅ check ở service |
+| NFR-2.7 | `minParticipants` của sự kiện được phép null nhưng nếu nhập thì không âm | ✅ `@PositiveOrZero` |
 
 ### NFR-3. Trải nghiệm
 | Mã | Yêu cầu |
@@ -116,6 +122,7 @@
 | NFR-5.3 | Mọi entity có `createdAt` (auto `@CreationTimestamp`) |
 | NFR-5.4 | Khoá ngoại dùng `@ManyToOne(fetch=LAZY)` (tránh load không cần thiết) |
 | NFR-5.5 | Unique constraint chống join lớp trùng / đăng ký sự kiện trùng |
+| NFR-5.6 | Participant lưu `source`; dữ liệu cũ `source == null` fallback thành `VOLUNTEER` |
 
 ## 2.3. Giới hạn phạm vi (Out of scope)
 
@@ -140,12 +147,12 @@
 | FR-2 Lớp | 5/5 ✅ | |
 | FR-3 Khoản thu | 11/11 ✅ | |
 | FR-4 Khoản chi | 2/2 ✅ | |
-| FR-5 Sự kiện | 16/16 ✅ code / ⚠️ cần test device | FR-5.11–5.16 đã implement BE+FE, build/analyze pass; cần kiểm thử thực tế trên Android device cho luồng chụp ảnh → upload → duyệt |
+| FR-5 Sự kiện | 21/21 BE ✅ / FE phần detail+assign pending | BE đã hỗ trợ `minParticipants`, detail event và assign participant; FE chưa tích hợp `EventDetailScreen`, `AssignParticipantsSheet`, input `minParticipants` |
 | NFR-1 Bảo mật | 8/8 ✅ | |
-| NFR-2 Validation | 6/6 ✅ | |
+| NFR-2 Validation | 7/7 ✅ | |
 | NFR-3 Trải nghiệm | 5/5 ✅ | |
 | NFR-4 Hiệu năng | 3/3 ✅ | |
-| NFR-5 Dữ liệu | 5/5 ✅ | |
+| NFR-5 Dữ liệu | 6/6 ✅ | |
 | NFR-6 Upload ảnh | 4/5 ✅ / 1🟢 | NFR-6.5 là hướng phát triển |
 
-**Tổng: 64 yêu cầu** (thêm 6 FR camera check-in + 5 NFR upload ảnh). Code đã implement toàn bộ; FR-5.11–5.16 và NFR-6 cần kiểm thử E2E trên thiết bị thật để xác nhận hoàn chỉnh.
+**Tổng: 76 yêu cầu**. Backend đã hoàn thành phần Event mới (`minParticipants`, detail, assign participants) và vẫn cần FE tích hợp màn chi tiết/chỉ định participant ở bước tiếp theo.

@@ -50,7 +50,7 @@ GRANT ALL PRIVILEGES ON classhub_db.* TO 'classhub_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-> **Schema (10 bảng) sẽ được Hibernate auto-tạo** khi BE chạy lần đầu (`ddl-auto=update`).
+> **Schema (13 bảng) sẽ được Hibernate auto-tạo** khi BE chạy lần đầu (`ddl-auto=update`).
 
 ### 11.3.2. Cấu hình `application.properties`
 
@@ -73,14 +73,11 @@ server.port=8080
 jwt.secret=classhub-super-secret-key-2026-do-an-tot-nghiep-spring-boot-flutter
 jwt.expiration=86400000
 
-# VietQR — Không còn dùng config cố định
-# Tài khoản nhận tiền lấy từ DB table classroom_bank_accounts
-# vietqr.bank-bin=970415
-# vietqr.account-no=109875610620
-# vietqr.account-name=Nguyen Duy Phong
+# VietQR
 vietqr.template=compact2
+vietqr.banks-url=https://api.vietqr.io/v2/banks
 
-# Upload ảnh minh chứng — ĐƯờng dẫn thư mục lưu file (ngoài repo)
+# Upload ảnh minh chứng — Đường dẫn thư mục lưu file (ngoài repo)
 classhub.upload-dir=D:/big_dream/classhub-uploads
 ```
 
@@ -114,6 +111,27 @@ curl -i http://localhost:8080/api/classrooms/my
 # Expect: HTTP/1.1 401
 # Body: {"status":401,"message":"Chưa đăng nhập hoặc token không hợp lệ"}
 ```
+
+### 11.3.5. Đồng bộ Bank catalog VietQR
+
+Sau khi backend chạy, đồng bộ danh mục ngân hàng một lần trước khi cấu hình tài khoản nhận tiền cho lớp.
+
+```bash
+# Login lấy JWT
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@demo.com","password":"12345678"}' \
+  | jq -r .token)
+
+# Sync bank catalog từ VietQR vào bảng banks
+curl -X POST http://localhost:8080/api/banks/sync \
+  -H "Authorization: Bearer $TOKEN"
+
+# Kiểm tra danh sách bank active (GET /api/banks hiện public)
+curl http://localhost:8080/api/banks
+```
+
+`POST /api/banks/sync` hiện chỉ yêu cầu JWT vì project chưa có role system-admin/global-admin; production nên restrict hoặc chuyển thành job nội bộ.
 
 Nếu cả 2 request OK → BE đã chạy đúng.
 

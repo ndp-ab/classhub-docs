@@ -19,7 +19,7 @@ classhub_app/
 │   │   │                                  AppEmptyState, AppErrorState,
 │   │   │                                  AppLoading, PaymentStatusBadge
 │   │   ├── config/                     — AppConfig, API base URL
-│   │   ├── constants/                  — UserRoles, vietnam_banks, role helpers
+│   │   ├── constants/                  — UserRoles, role helpers
 │   │   └── utils/                      — formatVnd, formatDate,
 │   │                                      formatDateTime
 │   ├── models/                         — Data class parse JSON
@@ -81,8 +81,8 @@ Tổng **15 màn hình** chia 3 nhóm:
 | `screens/create_classroom_screen.dart` | Form tạo lớp, sau khi thành công hiển thị invite code + nút Copy. |
 | `screens/join_classroom_screen.dart` | Input invite code, gọi `joinClassroom`. |
 | `screens/classroom_switcher_sheet.dart` | Bottom sheet đổi lớp trong workspace. Load danh sách lớp bằng `ClassroomService.getMyClassrooms(...)`, chọn lớp khác thì trả classroom data cho màn hiện tại. |
-| `screens/classroom_bank_account_screen.dart` | **Mới (2026-06-05)**: Form cấu hình tài khoản ngân hàng nhận tiền của lớp. Chỉ Admin. Chọn ngân hàng từ bottom sheet search (20 ngân hàng VN hard-code), nhập số TK/chủ TK/ghi chú. Confirmation dialog trước khi lưu. |
-| `screens/notification_screen.dart` | **Mới (2026-06-09)**: Inbox thông báo in-app của user. Tap item hiện chỉ đánh dấu đã đọc, chưa điều hướng sâu sang lớp/tab/đối tượng liên quan. Nút "Đánh dấu tất cả đã đọc". Dot badge đỏ cho thông báo chưa đọc. Pull-to-refresh. Loading/empty/error state. |
+| `screens/classroom_bank_account_screen.dart` | Form cấu hình tài khoản ngân hàng nhận tiền của lớp. Chỉ Admin. Load danh mục ngân hàng từ `GET /api/banks`, bottom sheet có search/filter local, loading/error/retry, nhập số TK/chủ TK/ghi chú. Confirmation dialog trước khi lưu. |
+| `screens/notification_screen.dart` | **Mới (2026-06-09)**: Inbox thông báo in-app của user. Hỗ trợ cả danh sách global và danh sách theo `classroomId`. Tap item hiện chỉ đánh dấu đã đọc, chưa điều hướng sâu sang lớp/tab/đối tượng liên quan. Nút "Đánh dấu tất cả đã đọc". Dot badge đỏ cho thông báo chưa đọc. Pull-to-refresh. Loading/empty/error state. |
 
 `HomeScreen` chỉ đóng vai trò chọn lớp để tiếp tục làm việc, không phải dashboard tổng. Dashboard/nghiệp vụ theo từng lớp nằm ở `ClassroomDetailScreen` và các tab con.
 
@@ -94,15 +94,15 @@ Tổng **15 màn hình** chia 3 nhóm:
 
 | File | Mô tả |
 |---|---|
-| `screens/classroom_detail_screen.dart` | Workspace theo lớp với header compact dùng chung, bottom navigation: Tổng quan, Quỹ, Sự kiện, Thành viên. Identity card lớp + stat cards chỉ hiển thị trong tab Tổng quan. |
+| `screens/classroom_detail_screen.dart` | Workspace theo lớp với header compact dùng chung, icon chuông notification theo lớp + badge unread theo `classroomId`, bottom navigation: Tổng quan, Quỹ, Sự kiện, Thành viên. Identity card lớp + stat cards chỉ hiển thị trong tab Tổng quan. |
 | `screens/fund/fund_tab.dart` | **Tab widget "Khoản thu"**. Đầu tab hiển thị card tài khoản nhận tiền của lớp (Admin có nút Thiết lập/Cập nhật, Member chỉ xem). Member thấy section "Khoản của bạn" + nút "Xem QR". Admin thấy FAB tạo đợt thu, tap card → chi tiết payments. |
 | `screens/fund/payment_qr_screen.dart` | Hiển thị QR (Image.network), **block thông tin tài khoản nhận tiền (ngân hàng, số TK, chủ TK)**, nội dung CK + nút Copy. Polling status 5s/lần qua `Timer.periodic`. Dispose timer khi pop. |
 | `screens/fund/collection_payments_screen.dart` | Admin xem ai đã/chưa đóng. Nút "Xác nhận" có confirm dialog. |
 | `screens/fund/create_collection_screen.dart` | Form tạo đợt thu (title, amount, deadline với DatePicker). |
 | `screens/fund/expenses_screen.dart` | **Tab widget "Khoản chi"**: list + tổng chi. FAB cho Admin. |
 | `screens/fund/create_expense_screen.dart` | Form tạo khoản chi. |
-| `screens/events/events_tab.dart` | **Tab widget "Sự kiện"**. Member nút Đăng ký/Huỷ. Admin FAB tạo + nút "Người tham gia". **Camera Check-in (MVP):** Member đã đăng ký có nút "Chụp ảnh điểm danh" — chụp, preview và gửi minh chứng **inline trong tab này**, không có màn riêng. |
-| `screens/events/create_event_screen.dart` | Form sự kiện (DateTimePicker). |
+| `screens/events/events_tab.dart` | **Tab widget "Sự kiện"**. Member nút Đăng ký/Huỷ. Admin FAB tạo + nút "Người tham gia". **Camera Check-in (MVP):** Member đã đăng ký có nút "Chụp ảnh điểm danh" — chụp, preview và gửi minh chứng **inline trong tab này**, không có màn riêng. Chưa mở `EventDetailScreen` khi tap card. |
+| `screens/events/create_event_screen.dart` | Form sự kiện (DateTimePicker). Chưa có input `minParticipants`. |
 | `screens/events/event_participants_screen.dart` | Admin xem danh sách + nút Check-in thủ công (có confirm dialog). **Camera Check-in (MVP):** Admin xem ảnh minh chứng, duyệt hoặc từ chối kèm lý do **ngay trong màn này**, không có màn riêng. |
 
 ## 9.5. Provider
@@ -144,7 +144,8 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - `joinClassroom(inviteCode, userId)`
 - `getMyClassrooms(userId)`
 - **`getBankAccount(classroomId)`** → `GET /api/classrooms/{classroomId}/bank-account`
-- **`updateBankAccount(classroomId, bankBin, bankName, accountNo, accountName, note)`** → `PUT /api/classrooms/{classroomId}/bank-account`
+- **`getBanks()`** → `GET /api/banks`, parse `List<Bank>`.
+- **`updateBankAccount(classroomId, bankBin, accountNo, accountName, note)`** → `PUT /api/classrooms/{classroomId}/bank-account`; body chỉ gửi `bankBin`, `accountNo`, `accountName`, optional `note`, không gửi `bankName`.
 - Tất cả gửi `Authorization: Bearer <token>` (đọc từ SharedPreferences).
 
 ### `services/fund_service.dart` (9 method)
@@ -152,7 +153,7 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - `getMyPayments / getPaymentQr / getPaymentStatus`
 - `getExpenses / createExpense`
 
-### `services/event_service.dart` (9 method)
+### `services/event_service.dart` (9 method hiện có)
 - `getEvents / createEvent`
 - `volunteer / cancelVolunteer`
 - `getParticipants / checkIn`
@@ -160,12 +161,17 @@ State được dùng trong `AuthWrapper` ở `main.dart` để chuyển giữa L
 - **`submitCheckinImage(eventId, imagePath, userId)`** → `POST /api/events/{eventId}/checkin-submissions` với `http.MultipartFile.fromPath('file', imagePath, contentType: MediaType('image', ext))` — **bắt buộc set `contentType`** để BE validate đúng.
 - **`getCheckinSubmissions(eventId) / approveSubmission(submissionId) / rejectSubmission(submissionId, reason)`**
 
+**BE contract đã sẵn sàng, FE pending:**
+- Planned `getEventDetail(eventId)` → `GET /api/events/detail/{eventId}`.
+- Planned `assignParticipants(eventId, userIds)` → `POST /api/events/{eventId}/participants/assign`.
+- `createEvent` cần thêm optional `minParticipants` khi cập nhật `CreateEventScreen`.
+
 ### `services/notification_service.dart` (4 method)
 - Dùng `AppConfig.baseUrl`, đọc token `jwt_token` từ `SharedPreferences`, gửi `Authorization: Bearer <token>`.
-- **`getNotifications({page, size})`** → `GET /api/notifications` — trả `List<AppNotification>`, parse Spring Page dạng `{ content: [...] }` từ response.
-- **`getUnreadCount()`** → `GET /api/notifications/unread-count` — trả `int`.
+- **`getNotifications({page, size, classroomId})`** → `GET /api/notifications` hoặc `GET /api/notifications?classroomId={id}` — trả `List<AppNotification>`, parse Spring Page dạng `{ content: [...] }` từ response.
+- **`getUnreadCount({classroomId})`** → `GET /api/notifications/unread-count` hoặc `GET /api/notifications/unread-count?classroomId={id}` — trả `int`.
 - **`markAsRead(recipientId)`** → `PUT /api/notifications/{recipientId}/read`.
-- **`markAllAsRead()`** → `PUT /api/notifications/read-all`.
+- **`markAllAsRead({classroomId})`** → `PUT /api/notifications/read-all` hoặc `PUT /api/notifications/read-all?classroomId={id}`.
 
 ### Conventions service
 - Helper `_headers(userId, {json:true})` build header (Bearer + Content-Type nếu POST).
@@ -201,11 +207,12 @@ nữa, mà dùng `UserRoles.isAdminLike(...)`. Backend hiện chỉ có `ADMIN`/
 
 | File | Class | Parse từ |
 |---|---|---|
-| `models/classroom_bank_account.dart` | `ClassroomBankAccount` | `ClassroomBankAccountResponse` (parse `bankBin`, `bankName`, `accountNo`, `accountName`, `note`, `active`, `createdByName`) |
+| `models/bank.dart` | `Bank` | `BankResponse` (`id`, `bankBin`, `code`, `name`, `shortName`, `logo`, `transferSupported`, `lookupSupported`), có getter `displayName` |
+| `models/classroom_bank_account.dart` | `ClassroomBankAccount` | `ClassroomBankAccountResponse` (parse `bankBin`, `bankName`, `shortName`, `accountNo`, `accountName`, `note`, `active`, `createdByName`), có getter `displayBankName` |
 | `models/fund_collection.dart` | `FundCollection` | `CollectionResponse` |
 | `models/payment.dart` | `Payment` | `PaymentResponse` (parse cả `amount`, `deadline`, `confirmedByName`) |
 | `models/expense.dart` | `Expense` | `ExpenseResponse` |
-| `models/event.dart` | `ClassEvent` + `EventParticipant` | `EventResponse` + `EventParticipantResponse` (có `eventId`, `checkedByName`) |
+| `models/event.dart` | `ClassEvent` + `EventParticipant` | `EventResponse` + `EventParticipantResponse` (có `eventId`, `checkedByName`). BE đã trả thêm `minParticipants`, `source`, `assignedByName`, `assignedAt`; FE cần cập nhật model khi làm Event detail/assign. |
 | `models/app_notification.dart` | `AppNotification` | `NotificationResponse` (parse `recipientId`, `notificationId`, `classroomId`, `type`, `title`, `message`, `targetType`, `targetId`, `isRead`/`read`, `readAt`, `createdAt`, `createdByName`) |
 
 Conventions:
@@ -256,9 +263,9 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 | `HomeScreen` | `GET /api/classrooms/my` |
 | `CreateClassroomScreen` | `POST /api/classrooms/create` |
 | `JoinClassroomScreen` | `POST /api/classrooms/join` |
-| `ClassroomDetailScreen` | Mở `ClassroomSwitcherSheet`; chính màn detail không gọi API trực tiếp |
+| `ClassroomDetailScreen` | Mở `ClassroomSwitcherSheet`; gọi `GET /api/notifications/unread-count?classroomId={id}` cho badge chuông theo lớp |
 | `ClassroomSwitcherSheet` | `GET /api/classrooms/my` |
-| `ClassroomBankAccountScreen` | `GET /api/classrooms/{classroomId}/bank-account` (load hiện tại) + `PUT /api/classrooms/{classroomId}/bank-account` (cập nhật) |
+| `ClassroomBankAccountScreen` | `GET /api/banks` (selector ngân hàng) + `GET /api/classrooms/{classroomId}/bank-account` (load hiện tại) + `PUT /api/classrooms/{classroomId}/bank-account` (cập nhật, không gửi `bankName`) |
 | `FundTab` | `GET /api/fund/collections/{classroomId}` + `GET /api/fund/payments/my/{classroomId}` + `GET /api/classrooms/{classroomId}/bank-account` (card tài khoản) |
 | `CreateCollectionScreen` | `POST /api/fund/collections` |
 | `CollectionPaymentsScreen` | `GET /api/fund/collections/{collectionId}/payments` + `PUT /api/fund/payments/{paymentId}/confirm` |
@@ -266,10 +273,13 @@ Tất cả set ở `AuthProvider._saveAuth`, đọc ở `AuthProvider.checkAuth`
 | `ExpensesScreen` | `GET /api/fund/expenses/{classroomId}` |
 | `CreateExpenseScreen` | `POST /api/fund/expenses` |
 | `EventsTab` | `GET /api/events/{classroomId}` + `GET /api/events/my/{classroomId}` + `POST /volunteer` / `DELETE /volunteer` + **`POST /checkin-submissions`** (upload ảnh inline) |
-| `CreateEventScreen` | `POST /api/events` |
+| `CreateEventScreen` | `POST /api/events` (BE đã nhận `minParticipants`, FE chưa có input) |
 | `EventParticipantsScreen` | `GET /api/events/{eventId}/participants` + `PUT /checkin/{userId}` + **`GET /checkin-submissions`** + **`PUT /checkin-submissions/{id}/approve`** + **`PUT /checkin-submissions/{id}/reject`** |
-| `NotificationScreen` | `GET /api/notifications` + `PUT /api/notifications/{recipientId}/read` + `PUT /api/notifications/read-all` |
-| `HomeScreen` (badge) | `GET /api/notifications/unread-count` khi `initState` và sau khi quay lại từ `NotificationScreen` |
+| `EventDetailScreen` | Pending FE: `GET /api/events/detail/{eventId}`, hiển thị `minParticipants` và tiến độ X/Y |
+| `AssignParticipantsSheet` | Pending FE: `GET /api/classrooms/{classroomId}/members` + `POST /api/events/{eventId}/participants/assign` |
+| `NotificationScreen` | Global: `GET /api/notifications`; theo lớp: `GET /api/notifications?classroomId={id}`; tap item: `PUT /api/notifications/{recipientId}/read`; mark all: `PUT /api/notifications/read-all` hoặc `?classroomId={id}` |
+| `HomeScreen` (badge global) | `GET /api/notifications/unread-count` khi `initState` và sau khi quay lại từ `NotificationScreen` |
+| `ClassroomDetailScreen` (badge theo lớp) | `GET /api/notifications/unread-count?classroomId={id}` khi mở lớp và sau khi quay lại từ `NotificationScreen(classroomId)` |
 
 ## 9.12. Luồng điều hướng
 
@@ -278,9 +288,12 @@ Splash (main → AuthWrapper)
    │
    ├─ token có trong prefs → HomeScreen
    │       │
-   │       ├─ Tap icon chuông → NotificationScreen (load list, tap item chỉ mark read)
+   │       ├─ Tap icon chuông → NotificationScreen global (load list, tap item chỉ mark read)
    │       │
    │       ├─ Tap card lớp → ClassroomDetailScreen
+   │       │       │
+   │       │       ├─ Tap icon chuông → NotificationScreen(classroomId, classroomName)
+   │       │       │       └─ Chỉ load notification của lớp hiện tại
    │       │       │
    │       │       ├─ Tap tên lớp ở header → ClassroomSwitcherSheet
    │       │       │       └─ Chọn lớp khác → pushReplacement ClassroomDetailScreen
@@ -333,15 +346,18 @@ Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace se
 
 ### NotificationScreen
 `NotificationScreen` là inbox in-app notification:
-- Load danh sách bằng `NotificationService.getNotifications(page: 0, size: 20)`.
+- Load danh sách global bằng `NotificationService.getNotifications(page: 0, size: 20)`.
+- Khi được mở từ `ClassroomDetailScreen`, nhận `classroomId`/`classroomName` và load bằng `NotificationService.getNotifications(classroomId: ...)`, chỉ hiển thị notification của lớp hiện tại.
 - Có `AppLoading`, `AppErrorState`, `AppEmptyState` và pull-to-refresh.
 - Thông báo chưa đọc hiển thị dot badge đỏ; tap item gọi `markAsRead(recipientId)` và cập nhật state local.
-- Nút "Đánh dấu tất cả đã đọc" gọi `markAllAsRead()` và set toàn bộ item trong list sang đã đọc.
-- MVP hiện chưa deep-link theo `targetType/targetId` sang tab/lớp/khoản thu/sự kiện.
+- Nút "Đánh dấu tất cả đã đọc" gọi `markAllAsRead()` hoặc `markAllAsRead(classroomId: ...)` và set toàn bộ item trong list hiện tại sang đã đọc.
+- Hiện chưa deep-link theo `targetType/targetId` sang tab/lớp/khoản thu/sự kiện; tap item chủ yếu mark read trong inbox.
 
 ### ClassroomDetailScreen workspace
 `ClassroomDetailScreen` là workspace theo lớp sau khi chọn lớp:
 - `_DashboardHeader` là header compact dùng chung cho toàn bộ tab.
+- Header có icon chuông theo lớp, load unread bằng `NotificationService.getUnreadCount(classroomId: widget.classroomId)`.
+- Tap icon chuông mở `NotificationScreen(classroomId: widget.classroomId, classroomName: widget.classroomName)`; sau khi quay lại thì refresh badge theo lớp.
 - Tên lớp trong `_DashboardHeader` có thể bấm để mở `ClassroomSwitcherSheet`.
 - Khi chọn lớp khác, màn dùng `Navigator.pushReplacement` mở lại `ClassroomDetailScreen` với `classroomId`, `classroomName`, `inviteCode`, `role`, `faculty`, `academicYear` của lớp mới; tab mặc định quay về Tổng quan.
 - Identity card lớp và 3 stat cards chỉ nằm trong tab Tổng quan.
@@ -371,10 +387,11 @@ Sau đăng nhập, `HomeScreen` là màn chọn lớp theo hướng workspace se
 
 ### Bank account setup UI
 `ClassroomBankAccountScreen` dùng bottom sheet search để chọn ngân hàng:
-- Bottom sheet chứa search bar + scrollable list 20 ngân hàng VN (hard-code local từ `lib/core/constants/vietnam_banks.dart`)
-- User gõ search để filter danh sách (theo tên ngân hàng hoặc tên viết tắt)
+- Danh sách ngân hàng lấy từ API `GET /api/banks`, parse vào `Bank`.
+- Bottom sheet có search bar + scrollable list, filter local theo `displayName`, `name`, `code`, `bankBin`.
+- Có loading/error/retry khi không tải được danh mục ngân hàng; empty state khi catalog chưa có dữ liệu.
 - User **bắt buộc chọn** từ danh sách, không được nhập tự do
-- Khi chọn ngân hàng → auto set `bankName` + `bankBin`
+- Khi chọn ngân hàng → FE giữ `bankBin`; tên hiển thị lấy từ `Bank.displayName`
 - Bank BIN **không hiển thị** trên UI, chỉ gửi khi submit
 - Form validation: phải chọn ngân hàng trước khi submit
 - Confirmation dialog hiển thị: ngân hàng đã chọn, số tài khoản, chủ tài khoản, ghi chú (không hiển thị BIN)
@@ -436,22 +453,22 @@ flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api
 
 | # | Hạn chế | Giải pháp tương lai |
 |---|---|---|
-| 1 | Tab Thành viên là placeholder | BE thêm API `/classrooms/{id}/members` |
+| 1 | Tab Thành viên là placeholder | FE tích hợp API `/classrooms/{id}/members` đã có |
 | 2 | Chưa có Dashboard thống kê | BE thêm API `/fund-statistics` |
 | 3 | 401 chưa tự logout về Login | Thêm interceptor ở service |
 | 4 | Format tiền/giờ pure-Dart (`formatVnd`, `formatDate`, `formatDateTime` ở `lib/core/utils/`), chưa dùng `intl` cho i18n | Cài `intl` + `NumberFormat`, `DateFormat` khi cần locale khác |
 | 5 | Loading dùng spinner đơn (`AppLoading`) | Skeleton shimmer (package `shimmer`) |
 | 6 | Chưa có sửa/xoá UI | BE thêm `PUT/DELETE` rồi FE thêm sau |
 | 7 | Polling QR fail silent khi mất mạng | Thêm error message + nút retry |
-| 8 | **Danh sách ngân hàng hard-code local 20 ngân hàng VN trong `lib/core/constants/vietnam_banks.dart`** | BE thêm API `/api/banks` dynamic + logo ngân hàng |
-| 9 | **Chưa có UI lịch sử tài khoản ngân hàng** | FE thêm màn history sau khi BE có API `/api/classrooms/{id}/bank-account/history` |
-| 10 | **Camera Check-in đã implement; cần kiểm thử thực tế trên Android device thật** | Chạy bằng `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` và test luồng chụp ảnh → upload → duyệt |
-| 11 | **`/uploads/**` hiện public — ảnh minh chứng ai cũng xem được qua URL** | Hướng phát triển: API download có JWT + phân quyền theo lớp |
-| 12 | **Notification hiện là in-app inbox, chưa có Firebase FCM/push notification ngoài app** | Thêm device token + FCM khi cần push nền/ngoài màn hình điện thoại |
-| 13 | **Chưa có reminder/scheduler trước giờ sự kiện** | Thêm job scheduler và notification type riêng |
-| 14 | **Chưa có notification theo lớp riêng trong `ClassroomDetailScreen` hoặc filter API theo `classroomId`** | BE thêm filter, FE thêm entry point theo workspace lớp |
-| 15 | **Tap notification hiện chỉ mark read, chưa điều hướng sâu theo `targetType/targetId`** | FE map target sang màn/tab tương ứng khi cần deep-link |
-| 16 | **Chưa có user notification settings, device token hoặc delivery logs** | Thêm khi triển khai push notification/notification preferences |
+| 8 | **Chưa có UI lịch sử tài khoản ngân hàng** | FE thêm màn history dùng API `/api/classrooms/{id}/bank-account/history` |
+| 9 | **Camera Check-in đã implement; cần kiểm thử thực tế trên Android device thật** | Chạy bằng `flutter run --dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` và test luồng chụp ảnh → upload → duyệt |
+| 10 | **`/uploads/**` hiện public — ảnh minh chứng ai cũng xem được qua URL** | Hướng phát triển: API download có JWT + phân quyền theo lớp |
+| 11 | **Notification hiện là in-app inbox, chưa có Firebase FCM/push notification ngoài app** | Thêm device token + FCM khi cần push nền/ngoài màn hình điện thoại |
+| 12 | **Chưa có reminder/scheduler trước giờ sự kiện** | Thêm job scheduler và notification type riêng |
+| 13 | **Đã có notification theo lớp trong `ClassroomDetailScreen`; chưa có deep-link chi tiết vào đúng tab/bản ghi** | FE map `targetType/targetId` sang màn/tab tương ứng khi cần deep-link |
+| 14 | **Tap notification hiện chủ yếu mark read, chưa mở chi tiết theo `targetType/targetId`** | Bổ sung điều hướng chi tiết khi có thiết kế deep-link |
+| 15 | **Chưa có user notification settings, device token hoặc delivery logs** | Thêm khi triển khai push notification/notification preferences |
+| 16 | **BE đã hỗ trợ Event detail + assign participants, FE chưa tích hợp** | Thêm `EventDetailScreen`, `AssignParticipantsSheet`, input `minParticipants` trong `CreateEventScreen`, tap card ở `EventsTab` mở detail |
 
 ## 9.17. Trạng thái build
 

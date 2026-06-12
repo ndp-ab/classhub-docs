@@ -4,14 +4,15 @@
 
 | Loại test | Trạng thái | Ghi chú |
 |---|---|---|
-| Manual test (Postman + Flutter) | ✅ Đã làm theo demo script | Xem `12-demo-script.md` |
-| Test case TC01–TC53 đặc tả | ✅ Đã liệt kê dưới | |
+| Manual test (Postman + Flutter) | ✅ Đã làm theo demo script hiện có | Event detail/assign cần test FE sau khi tích hợp |
+| Test case TC01–TC74 đặc tả | ✅ Đã liệt kê dưới | |
 | Test case tự động (JUnit + MockMvc) | 🟡 Chưa implement | Sẽ làm trong giai đoạn tiếp theo |
 | Test trên thiết bị thật | ⚠️ Cần test trước demo | Chạy FE với `--dart-define=API_BASE_URL=http://<IP-LAN>:8080/api` |
+| Verification BE Event mới | ✅ Đã chạy | `mvnw.cmd clean compile` BUILD SUCCESS; `mvnw.cmd test` pass, 1 test, 0 failures/errors |
 
-## 10.2. Bảng test case TC01–TC53
+## 10.2. Bảng test case TC01–TC74
 
-Test case bao phủ 7 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Event, Camera Check-in, Notification.
+Test case bao phủ 8 nhóm: Auth, Classroom, Bank Catalog, Classroom Bank Account, Fund, Event, Camera Check-in, Notification.
 
 | Mã TC | Module | Chức năng | Điều kiện | Kết quả mong đợi | Status |
 |---|---|---|---|---|---|
@@ -33,6 +34,12 @@ Test case bao phủ 7 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Even
 | TC11e | Bank Account | Admin xem lịch sử tài khoản | Admin lớp | 200, trả danh sách tất cả bản ghi (active + inactive) | ⬜ |
 | TC11f | Bank Account | Tạo khoản thu khi lớp chưa có tài khoản | Lớp chưa có bank account active | **400** "Vui lòng cấu hình tài khoản ngân hàng nhận tiền trước khi tạo khoản thu" | ⬜ |
 | TC11g | Bank Account | QR lấy tài khoản từ DB | Lớp có bank account active, member lấy QR | 200, QR chứa bankName/accountNo/accountName từ DB, không dùng config cố định | ⬜ |
+| TC-BANK-01 | Bank Catalog | Sync bank từ VietQR | User có JWT hợp lệ, VietQR trả response hợp lệ | `POST /api/banks/sync` trả `{ "syncedCount": N }`, upsert vào bảng `banks` | ⬜ |
+| TC-BANK-02 | Bank Catalog | List bank active | Bảng `banks` đã có dữ liệu active | `GET /api/banks` trả list `BankResponse` có `bankBin`, `shortName`, `logo`, không dùng field `bin` | ⬜ |
+| TC-BANK-03 | FE Bank Catalog | Bank selector load từ API | Mở `ClassroomBankAccountScreen` | FE gọi `GET /api/banks`, hiển thị loading/error/retry và list filter local | ⬜ |
+| TC-BANK-04 | Bank Account | Update bank account chỉ gửi `bankBin` | Admin chọn bank từ API, nhập STK/chủ TK | Request `PUT /bank-account` chỉ có `bankBin`, `accountNo`, `accountName`, optional `note`; không gửi `bankName` | ⬜ |
+| TC-BANK-05 | Bank Account | `bankBin` không tồn tại | Admin gửi `bankBin` chưa sync hoặc inactive | 400 "Ngân hàng không hợp lệ hoặc chưa được đồng bộ" | ⬜ |
+| TC-BANK-06 | FE Bank Catalog | Không còn hard-code bank list | Kiểm tra source FE | Không có `lib/core/constants/vietnam_banks.dart`; selector dùng `Bank` model từ API | ⬜ |
 | TC12 | Fund | Member tạo khoản thu | User role=MEMBER | **403** "Chỉ Ban cán sự được phép thao tác" | ⬜ |
 | TC13 | Fund | Admin tạo khoản thu hợp lệ | amount=50000, deadline=tương lai | 200, sinh N payment cho N member | ⬜ |
 | TC14 | Fund | Tạo khoản thu amount=0 | amount = 0 | **400** "Số tiền phải lớn hơn 0" | ⬜ |
@@ -42,34 +49,49 @@ Test case bao phủ 7 nhóm: Auth, Classroom, Classroom Bank Account, Fund, Even
 | TC18 | Fund | Admin lớp A xác nhận payment lớp B | Cross-class attack | **403** "Bạn không thuộc lớp này" | ⬜ |
 | TC19 | Fund | Member xem QR payment của người khác | userId != payment.user.id | **403** "Bạn chỉ có thể xem QR của chính mình" | ⬜ |
 | TC20 | Fund | Member join lớp đã có khoản thu | Lớp có 2 collection, user join sau | Auto sinh 2 payment cho user mới (B6) | ⬜ |
-| TC21 | Event | Admin tạo sự kiện | eventTime hợp lệ | 200 | ⬜ |
-| TC22 | Event | Member đăng ký tham gia | Chưa đăng ký lần nào | 200, tạo EventParticipant | ⬜ |
-| TC23 | Event | Đăng ký trùng | Đã đăng ký rồi | 400 "Bạn đã đăng ký..." | ⬜ |
-| TC24 | Event | User ngoài lớp đăng ký | userId không trong class_members | 403 "Bạn không thuộc lớp này" | ⬜ |
-| TC25 | Event | Member huỷ đăng ký chưa check-in | checkedIn=false | 204 | ⬜ |
-| TC26 | Event | Member huỷ sau khi đã check-in | checkedIn=true | 400 "Không thể hủy đăng ký sau khi đã check-in" | ⬜ |
-| TC27 | Event | Admin check-in thủ công | Participant chưa check-in | 200, set `checkedBy` + `checkedInAt` | ⬜ |
-| TC28 | Event | Check-in lại sinh viên đã check-in | checkedIn=true | 400 "Sinh viên này đã được check-in rồi" | ⬜ |
+| TC21 | Event | Admin tạo sự kiện có `minParticipants` | eventTime hợp lệ, `minParticipants=5` | 200, `EventResponse.minParticipants=5` | ⬜ |
+| TC22 | Event | List/detail event trả đúng `minParticipants` | Event đã tạo có `minParticipants` | `GET /api/events/{classroomId}` và `GET /api/events/detail/{eventId}` trả đúng `minParticipants` | ⬜ |
+| TC23 | Event | Member tự đăng ký tham gia | Chưa đăng ký lần nào | 200, tạo EventParticipant `source=VOLUNTEER` | ⬜ |
+| TC24 | Event | Đăng ký trùng | Đã đăng ký rồi | 400 "Bạn đã đăng ký..." | ⬜ |
+| TC25 | Event | User ngoài lớp đăng ký | userId không trong class_members | 403 "Bạn không thuộc lớp này" | ⬜ |
+| TC26 | Event | Admin assign member | Admin lớp, user thuộc lớp và chưa là participant | 200, tạo EventParticipant `source=ASSIGNED`, có `assignedByName`, `assignedAt` | ⬜ |
+| TC27 | Event | Assign duplicate `userIds` | Request `{"userIds":[11,12,11]}` | Không tạo trùng participant; duplicate được distinct | ⬜ |
+| TC28 | Event | Assign user đã `VOLUNTEER` | User đã tự đăng ký trước | Không đổi `source` sang `ASSIGNED`, không tạo participant mới | ⬜ |
+| TC29 | Event | Member `ASSIGNED` tự huỷ | Participant `source=ASSIGNED`, chưa check-in | 400, không xoá participant | ⬜ |
+| TC30 | Event | Member `VOLUNTEER` huỷ khi chưa check-in | Participant `source=VOLUNTEER`, `checkedIn=false` | 204, xoá participant | ⬜ |
+| TC31 | Event | Member `VOLUNTEER` huỷ sau khi check-in | Participant `source=VOLUNTEER`, `checkedIn=true` | 400 "Không thể hủy đăng ký sau khi đã check-in" | ⬜ |
+| TC32 | Event | Admin check-in participant `ASSIGNED` | Participant `source=ASSIGNED`, chưa check-in | 200, set `checkedBy` + `checkedInAt` | ⬜ |
+| TC33 | Event | Check-in lại sinh viên đã check-in | checkedIn=true | 400 "Sinh viên này đã được check-in rồi" | ⬜ |
+| TC34 | Event Security | Member gọi assign | User là MEMBER của lớp | 403 "Bạn không phải Admin của lớp" | ⬜ |
+| TC35 | Event Security | Assign user ngoài lớp | `userIds` có user không thuộc lớp hoặc không tồn tại | 400/403 theo implementation, không tạo participant | ⬜ |
 | TC-FILE-01 | Camera Check-in | Member gửi ảnh điểm danh hợp lệ | Ảnh jpg, size < 5MB, đã đăng ký sự kiện | 200, tạo submission PENDING, lưu file vào `classhub-uploads/` | ⬜ |
 | TC-FILE-02 | Camera Check-in | Gửi file không phải ảnh (pdf) | contentType = application/pdf hoặc extension .pdf | 400 "File phải là ảnh" | ⬜ |
 | TC-FILE-03 | Camera Check-in | Admin duyệt ảnh PENDING | submission.status=PENDING | 200, set APPROVED, set EventParticipant.checkedIn=true | ⬜ |
 | TC-FILE-04 | Camera Check-in | Admin từ chối ảnh kèm lý do | submission.status=PENDING | 200, set REJECTED, lưu rejectedReason | ⬜ |
 | TC-FILE-05 | Camera Check-in | Member gửi lại ảnh sau khi bị từ chối | submission REJECTED, member gửi mới | 200, tạo submission PENDING mới | ⬜ |
-| TC-NOTI-01 | Notification | Lấy danh sách thông báo | User đã đăng nhập, có notification recipient | `GET /api/notifications?page=0&size=20` trả `Page` có `content`, chỉ notification của user hiện tại | ⬜ |
-| TC-NOTI-02 | Notification | Đếm unread count | User có N recipient `is_read=false` | `GET /api/notifications/unread-count` trả `{ "count": N }` | ⬜ |
-| TC-NOTI-03 | Notification | Mark one as read | Recipient thuộc user hiện tại, `is_read=false` | `PUT /api/notifications/{recipientId}/read` trả `isRead=true`, DB set `read_at` | ⬜ |
-| TC-NOTI-04 | Notification | Mark all as read | User có nhiều notification chưa đọc | `PUT /api/notifications/read-all` trả `{ "count": 0 }`, tất cả recipient của user được set read | ⬜ |
-| TC-NOTI-05 | Notification | Admin tạo event → member nhận notification | Admin lớp tạo sự kiện mới | Member trong lớp nhận `EVENT_CREATED`, `targetType=EVENT`, `targetId=event.id` | ⬜ |
-| TC-NOTI-06 | Notification | Admin tạo khoản thu → member nhận notification | Admin lớp tạo khoản thu mới | Member trong lớp nhận `COLLECTION_CREATED`, `targetType=FUND_COLLECTION`, `targetId=collection.id` | ⬜ |
-| TC-NOTI-07 | Notification | Người tạo không nhận notification của chính mình | Admin tạo event/khoản thu | Không tạo `NotificationRecipient` cho user tạo nghiệp vụ | ⬜ |
-| TC-NOTI-08 | Notification Security | User không đọc/sửa recipient của user khác | User A gọi `PUT /api/notifications/{recipientIdOfUserB}/read` | 403, recipient của user B không đổi trạng thái | ⬜ |
-| TC-NOTI-09 | FE Notification | Home badge hiển thị đúng | User có unread count > 0 | `HomeScreen` hiển thị badge số chưa đọc trên icon chuông; quay lại từ `NotificationScreen` thì refresh count | ⬜ |
-| TC-NOTI-10 | FE Notification | NotificationScreen hiển thị list/empty/error/loading | Mock/API trả đủ 4 trạng thái | UI dùng loading, empty state, error state và list item đúng dữ liệu | ⬜ |
-| TC-NOTI-11 | FE Notification | Pull refresh | Đang ở `NotificationScreen` | Kéo refresh gọi lại `GET /api/notifications`, list cập nhật | ⬜ |
-| TC-NOTI-12 | FE Notification | Tap item mark read | Item đang unread | Tap item gọi mark read, dot unread biến mất, không điều hướng sâu | ⬜ |
-| TC-NOTI-13 | FE Notification | Mark all read | Có ít nhất 1 item unread | Bấm "Đánh dấu tất cả đã đọc" gọi API, toàn bộ item chuyển sang read | ⬜ |
+| TC-NOTI-01 | Notification | Lấy danh sách thông báo global | User đã đăng nhập, có notification recipient ở nhiều lớp | `GET /api/notifications?page=0&size=20` trả `Page` có `content`, chỉ notification của user hiện tại | ⬜ |
+| TC-NOTI-02 | Notification | Lấy danh sách thông báo theo lớp | User có notification ở lớp A và B | `GET /api/notifications?classroomId={id}&page=0&size=20` chỉ trả notification của lớp `{id}` và của current user | ⬜ |
+| TC-NOTI-03 | Notification | Đếm unread global | User có N recipient `is_read=false` ở nhiều lớp | `GET /api/notifications/unread-count` trả `{ "count": N }` | ⬜ |
+| TC-NOTI-04 | Notification | Đếm unread theo `classroomId` | User có unread ở lớp A và B | `GET /api/notifications/unread-count?classroomId={id}` chỉ đếm unread của lớp `{id}` | ⬜ |
+| TC-NOTI-05 | Notification | Mark one as read | Recipient thuộc user hiện tại, `is_read=false` | `PUT /api/notifications/{recipientId}/read` trả `isRead=true`, DB set `read_at` | ⬜ |
+| TC-NOTI-06 | Notification | Mark all global | User có nhiều notification chưa đọc ở nhiều lớp | `PUT /api/notifications/read-all` set read toàn bộ recipient chưa đọc của current user | ⬜ |
+| TC-NOTI-07 | Notification | Mark all theo `classroomId` không ảnh hưởng lớp khác | User có unread ở lớp A và B | `PUT /api/notifications/read-all?classroomId=A` chỉ set read recipient của lớp A; unread lớp B giữ nguyên | ⬜ |
+| TC-NOTI-08 | Notification | Admin tạo event → member nhận notification | Admin lớp tạo sự kiện mới | Member trong lớp nhận `EVENT_CREATED`, `targetType=EVENT`, `targetId=event.id` | ⬜ |
+| TC-NOTI-09 | Notification | Admin tạo khoản thu → member nhận notification | Admin lớp tạo khoản thu mới | Member trong lớp nhận `COLLECTION_CREATED`, `targetType=FUND_COLLECTION`, `targetId=collection.id` | ⬜ |
+| TC-NOTI-10 | Notification | Admin xác nhận payment → member nhận notification | Payment thuộc member, admin xác nhận lần đầu | Member sở hữu payment nhận `PAYMENT_CONFIRMED`, `targetType=FUND_PAYMENT`, `targetId=payment.id` | ⬜ |
+| TC-NOTI-11 | Notification | Member submit ảnh check-in → admin nhận notification | Member đã đăng ký sự kiện, gửi ảnh hợp lệ | Admin/lớp trưởng nhận `CHECKIN_SUBMITTED`, `targetType=CHECKIN_SUBMISSION`, `targetId=submission.id` | ⬜ |
+| TC-NOTI-12 | Notification | Admin approve ảnh → member nhận notification | Submission PENDING thuộc member | Member chủ submission nhận `CHECKIN_APPROVED`, `targetType=CHECKIN_SUBMISSION`, `targetId=submission.id` | ⬜ |
+| TC-NOTI-13 | Notification | Admin reject ảnh → member nhận notification | Submission PENDING thuộc member, có lý do từ chối | Member chủ submission nhận `CHECKIN_REJECTED`, `targetType=CHECKIN_SUBMISSION`, `targetId=submission.id` | ⬜ |
+| TC-NOTI-14 | Notification | Người tạo không nhận notification của chính mình | Admin tạo event/khoản thu hoặc user submit ảnh check-in | Không tạo `NotificationRecipient` cho user tạo nghiệp vụ trong các luồng có logic loại trừ người tạo | ⬜ |
+| TC-NOTI-15 | Notification Security | User không đọc/sửa recipient của user khác | User A gọi `PUT /api/notifications/{recipientIdOfUserB}/read` | 403, recipient của user B không đổi trạng thái | ⬜ |
+| TC-NOTI-16 | FE Notification | Home badge global hiển thị đúng | User có unread count > 0 ở một hoặc nhiều lớp | `HomeScreen` hiển thị badge tổng số chưa đọc trên icon chuông; quay lại từ `NotificationScreen` thì refresh count | ⬜ |
+| TC-NOTI-17 | FE Notification | ClassroomDetail bell chỉ hiển thị notification của lớp hiện tại | User có notification ở lớp A và B | Icon chuông trong `ClassroomDetailScreen` lớp A mở `NotificationScreen(classroomId=A)` và badge chỉ tính unread lớp A | ⬜ |
+| TC-NOTI-18 | FE Notification | NotificationScreen hiển thị list/empty/error/loading | Mock/API trả đủ 4 trạng thái | UI dùng loading, empty state, error state và list item đúng dữ liệu | ⬜ |
+| TC-NOTI-19 | FE Notification | Pull refresh | Đang ở `NotificationScreen` global hoặc theo lớp | Kéo refresh gọi lại API đúng scope, list cập nhật | ⬜ |
+| TC-NOTI-20 | FE Notification | Tap item mark read | Item đang unread | Tap item gọi mark read, dot unread biến mất, không điều hướng sâu | ⬜ |
+| TC-NOTI-21 | FE Notification | Mark all read | Có ít nhất 1 item unread trong scope hiện tại | Bấm "Đánh dấu tất cả đã đọc" gọi API global hoặc theo `classroomId`, toàn bộ item trong list chuyển sang read | ⬜ |
 
-**Tổng: 53 test case** (thêm 5 test case cho Camera Check-in và 13 test case cho Notification MVP).
+**Tổng: 74 test case** (thêm 6 test case Bank Catalog; Event bổ sung `minParticipants` + assigned participants; Camera Check-in 5 test case; Notification in-app nâng cao 21 test case).
 
 ## 10.3. Bộ dữ liệu test
 
@@ -212,7 +234,10 @@ Xem `12-demo-script.md` — 13 bước E2E từ đăng ký đến check-in sự 
 3. Tap icon chuông, kiểm tra `NotificationScreen` hiển thị item mới.
 4. Tap item, kiểm tra dot unread biến mất.
 5. Quay lại `HomeScreen`, kiểm tra badge được refresh.
-6. Tạo thêm nhiều notification, mở lại `NotificationScreen`, bấm "Đánh dấu tất cả đã đọc" và kiểm tra badge về 0.
+6. Vào `ClassroomDetailScreen` của lớp K64KTPM3, kiểm tra icon chuông theo lớp có badge unread đúng với lớp hiện tại.
+7. Tap icon chuông trong lớp, kiểm tra `NotificationScreen` chỉ hiển thị notification của lớp K64KTPM3.
+8. Tạo thêm notification ở lớp khác, kiểm tra badge/list của lớp K64KTPM3 không bị lẫn dữ liệu.
+9. Tạo thêm nhiều notification, mở lại `NotificationScreen`, bấm "Đánh dấu tất cả đã đọc" và kiểm tra badge trong scope hiện tại về 0.
 
 ### 10.6.5. Flutter widget test (chưa làm)
 Có thể viết widget test cho:
@@ -250,9 +275,11 @@ Có thể viết widget test cho:
 
 ## 10.9. Tổng kết kiểm thử
 
-- **53 test case đặc tả** bao phủ 7 module (thêm 5 test case cho Camera Check-in và 13 test case cho Notification MVP), 4 loại HTTP status (200, 400, 401, 403).
-- **Manual test** đã chạy luồng E2E qua demo script (BE compile + FE pub get sạch).
+- **74 test case đặc tả** bao phủ 8 module (Bank Catalog dynamic, Event bổ sung `minParticipants` + assigned participants, Camera Check-in 5 test case, Notification in-app nâng cao 21 test case), 4 loại HTTP status (200, 400, 401, 403).
+- **Manual test** đã chạy luồng E2E hiện có qua demo script (BE compile + FE pub get sạch); Event detail/assign sẽ test sau khi FE tích hợp.
 - **Camera Check-in** (đặc biệt TC-FILE-01 đến TC-FILE-05): đã implement BE+FE, build/analyze pass; **cần kiểm thử thực tế trên Android device** cho luồng chụp ảnh → upload → duyệt/từ chối.
-- **Notification MVP** (TC-NOTI-01 đến TC-NOTI-13): tập trung vào inbox in-app, unread count, mark read, mark all read, auto emit khi tạo event/khoản thu và ownership security.
+- **Notification in-app nâng cao** (TC-NOTI-01 đến TC-NOTI-21): tập trung vào inbox global/theo lớp, unread count global/theo lớp, mark read, mark all read, auto emit khi tạo event/khoản thu/xác nhận payment/check-in và ownership security.
+- **Event assigned participants** (TC21 đến TC35): tập trung vào `minParticipants`, `source=VOLUNTEER/ASSIGNED`, idempotency assign, rule không cho `ASSIGNED` tự huỷ và quyền Admin-only.
+- **Bank Catalog dynamic** (TC-BANK-01 đến TC-BANK-06): tập trung vào sync VietQR, list bank active, FE selector load API, update bank account không gửi `bankName`, validate `bankBin`, và xoá hard-code bank list.
 - **Test tự động** chưa implement — đưa vào kế hoạch giai đoạn tiếp theo.
 - **Bug history**: 8 bug critical đã fix toàn bộ trong audit B1–B8 + bug Camera Check-in `contentType` (FE đã thêm `MediaType` khi upload multipart).

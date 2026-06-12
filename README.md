@@ -12,15 +12,15 @@
 | # | Tài liệu | Nội dung |
 |---|---|---|
 | [01](01-khao-sat-bai-toan.md) | Khảo sát bài toán | Hiện trạng quản lý lớp bằng Zalo + Excel + Forms; vấn đề rút ra; nhu cầu Admin/Member |
-| [02](02-yeu-cau-he-thong.md) | Yêu cầu hệ thống | 32 yêu cầu chức năng + 26 yêu cầu phi chức năng + giới hạn phạm vi |
-| [03](03-actor-usecase.md) | Actor & Use Case | 3 actor (Guest/Member/Admin); 23 use case; sơ đồ Mermaid |
-| [04](04-thiet-ke-csdl-erd.md) | Thiết kế CSDL / ERD | 9 bảng, quan hệ n-n qua ClassMember; sơ đồ ERD Mermaid |
-| [05](05-sequence-diagram.md) | Sequence Diagram | 6 luồng quan trọng (login, tạo khoản thu, xác nhận, QR+polling, volunteer, check-in) |
+| [02](02-yeu-cau-he-thong.md) | Yêu cầu hệ thống | 42 yêu cầu chức năng + 34 yêu cầu phi chức năng + giới hạn phạm vi |
+| [03](03-actor-usecase.md) | Actor & Use Case | 3 actor (Guest/Member/Admin); 28 use case; sơ đồ Mermaid |
+| [04](04-thiet-ke-csdl-erd.md) | Thiết kế CSDL / ERD | 13 bảng, quan hệ n-n qua ClassMember; sơ đồ ERD Mermaid |
+| [05](05-sequence-diagram.md) | Sequence Diagram | 10 luồng quan trọng (login, quỹ, QR, volunteer, assign participant, cancel, check-in, camera check-in) |
 | [06](06-kien-truc-he-thong.md) | Kiến trúc hệ thống | 3 lớp client-server; 5 tầng backend; tech stack; layered architecture |
-| [07](07-api-documentation.md) | API Documentation | 24 endpoint REST chi tiết: request/response/status/quyền |
+| [07](07-api-documentation.md) | API Documentation | 38 endpoint REST chi tiết: request/response/status/quyền |
 | [08](08-backend-documentation.md) | Backend Documentation | Cấu trúc package; service/repository/entity/dto; convention |
-| [09](09-frontend-documentation.md) | Frontend Documentation | 14 màn hình; Provider; service layer; navigation flow |
-| [10](10-kiem-thu.md) | Kiểm thử | 35 test case + hướng dẫn chạy Postman/JUnit + bug history |
+| [09](09-frontend-documentation.md) | Frontend Documentation | Flutter mobile app; Provider; service layer; navigation flow; Event detail/assign pending |
+| [10](10-kiem-thu.md) | Kiểm thử | 74 test case + hướng dẫn chạy Postman/JUnit + bug history |
 | [11](11-huong-dan-cai-dat.md) | Hướng dẫn cài đặt | Setup BE + DB + FE + troubleshoot |
 | [12](12-demo-script.md) | Demo Script | 10+ bước demo + câu hỏi hội đồng + backup plan |
 | [13](13-tai-khoan-test.md) | Tài khoản test | Script setup nhanh trước demo |
@@ -66,29 +66,38 @@
 
 ---
 
-## Trạng thái dự án (cập nhật 2026-06-05)
+## Trạng thái dự án (cập nhật 2026-06-12)
 
 ### Đã hoàn thành
 - ✅ 3 phân hệ chính: Auth, Quỹ lớp (gồm QR), Sự kiện
-- ✅ 24/24 endpoint REST
-- ✅ 14/14 màn Flutter
+- ✅ 38 endpoint REST backend
+- ✅ API members: `GET /api/classrooms/{classroomId}/members`
+- ✅ Backend Event nâng cấp: `minParticipants`, detail event, assigned participants
+- ✅ Flutter core hiện có: Auth, lớp, quỹ, sự kiện, camera check-in, notification in-app
 - ✅ Bảo mật + Audit trail (sau B1–B8)
-- ✅ Manual test E2E qua demo script
+- ✅ Manual test E2E luồng hiện có qua demo script
 - ✅ Design system FE (theme tokens + 9 shared widgets) + refactor 13 màn
 - ✅ HomeScreen class selector + ClassroomDetailScreen workspace layout
 - ✅ Classroom switcher bottom sheet trong workspace
 - ✅ Fix bug freeze CollectionPaymentsScreen trên Chrome Web (Tier 4 refactor)
 - ✅ Tài khoản nhận tiền theo lớp (BE + FE)
+- ✅ Bank catalog VietQR dynamic (`GET /api/banks`, `POST /api/banks/sync`)
+- ✅ FE bank selector load từ API, không còn hard-code danh sách ngân hàng
 - ✅ QR thanh toán dynamic theo tài khoản active của lớp
 - ✅ Card tài khoản nhận tiền trong tab Quỹ
 - ✅ Màn cấu hình tài khoản với bank selector
+- ✅ In-app notification global/theo lớp
+- ✅ BE verification Event mới: compile pass, test pass
 
 ### Còn lại trước demo
 - 🔴 Smoke test BE qua Postman (15 phút)
 - 🔴 Test trên thiết bị thật (15 phút)
+- 🟡 FE Event detail/assign nếu muốn demo nghiệp vụ chỉ định người tham gia
 
 ### Sẽ làm nếu còn thời gian
-- 🟡 API `/classrooms/{id}/members` + tab Thành viên FE (1h tổng)
+- 🟡 Tab Thành viên FE dùng API members đã có
+- 🟡 `EventDetailScreen` + `AssignParticipantsSheet`
+- 🟡 `CreateEventScreen` thêm input `minParticipants`, `EventsTab` tap card mở detail
 - 🟡 API `/fund-statistics` + Dashboard FE (1-2h)
 - 🟡 Test case JUnit + MockMvc (3-4h)
 - 🟡 Postman collection export
@@ -145,7 +154,7 @@ D:/big_dream/
 | Backend | Spring Boot 4.0, Spring Security, JPA/Hibernate, jjwt |
 | Database | MySQL 8 |
 | Build tool | Maven (mvnw) |
-| External | VietQR (img.vietqr.io) |
+| External | VietQR (`img.vietqr.io` cho QR image, `api.vietqr.io/v2/banks` cho bank catalog sync) |
 
 ---
 

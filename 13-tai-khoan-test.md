@@ -96,15 +96,20 @@ for u in sv1 sv2; do
     -d "{\"inviteCode\":\"$INVITE_CODE\"}"
 done
 
-# 5. Admin cấu hình tài khoản ngân hàng cho lớp (bắt buộc trước khi tạo khoản thu)
+# 5. Sync bank catalog VietQR (bắt buộc trước khi cấu hình tài khoản lớp)
+curl -s -X POST $BASE/banks/sync \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+curl -s $BASE/banks | jq '.[0:3]'
+
+# 6. Admin cấu hình tài khoản ngân hàng cho lớp (bắt buộc trước khi tạo khoản thu)
 CLASSROOM_ID=$(curl -s $BASE/classrooms/my \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq '.[0].id')
 curl -s -X PUT $BASE/classrooms/$CLASSROOM_ID/bank-account \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"bankBin":"970422","bankName":"Ngân hàng TMCP Quân đội","accountNo":"0123456789","accountName":"NGUYEN VAN A","note":"Tài khoản thủ quỹ lớp"}'
+  -d '{"bankBin":"970422","accountNo":"0123456789","accountName":"NGUYEN VAN A","note":"Tài khoản thủ quỹ lớp"}'
 
-# 6. Admin tạo khoản thu "Quỹ lớp tháng 5"
+# 7. Admin tạo khoản thu "Quỹ lớp tháng 5"
 curl -s -X POST $BASE/fund/collections \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
@@ -114,7 +119,7 @@ curl -s -X POST $BASE/fund/collections \
 Sau script:
 - 4 user đã đăng ký.
 - 1 lớp K64KTPM3 đã có 3 thành viên (1 Admin + 2 Member).
-- Tài khoản ngân hàng đã cấu hình cho lớp (MB Bank `0123456789`).
+- Bank catalog đã được sync từ VietQR; tài khoản ngân hàng test đã cấu hình cho lớp bằng `bankBin=970422`.
 - 1 khoản thu 50.000đ với 2 payment chưa xác nhận.
 
 → Sẵn sàng demo từ Bước 6 trong `12-demo-script.md` (sinh viên xem QR).
@@ -130,13 +135,12 @@ CREATE DATABASE classhub_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ## 13.7. Tài khoản ngân hàng (cho QR thật)
 
-> **Từ giai đoạn 8.5**, tài khoản ngân hàng **không dùng config cố định trong `application.properties`** nữa.
-> Config cũ (`vietqr.bank-bin`, `vietqr.account-no`, `vietqr.account-name`) đã được comment ra.
+> Tài khoản ngân hàng **không dùng config cố định trong `application.properties`**. Danh mục ngân hàng lấy từ bảng `banks`, được sync qua `POST /api/banks/sync`.
 
 **Cách cấu hình đúng:**
 1. Đăng nhập bằng tài khoản Admin.
 2. Trong tab "Khoản thu" của lớp → bấm **"Thiết lập tài khoản nhận tiền"**.
-3. Chọn ngân hàng, nhập số TK + chủ TK + ghi chú → bấm "Lưu".
+3. Chọn ngân hàng từ danh mục backend, nhập số TK + chủ TK + ghi chú → bấm "Lưu".
 4. QR sẽ tự động dùng tài khoản vừa cấu hình.
 
 Hoặc dùng API trực tiếp (xem bước 5 trong script 13.5 phía trên).

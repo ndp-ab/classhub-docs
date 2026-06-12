@@ -42,7 +42,10 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
 | Tạo sự kiện | — | ❌ → 403 | ✅ (lớp mình) |
 | Xem danh sách sự kiện | — | ✅ (lớp mình) | ✅ |
 | Đăng ký tham gia sự kiện | — | ✅ | ✅ |
-| Huỷ đăng ký | — | ✅ (nếu chưa check-in) | ✅ |
+| Thấy trạng thái tham gia (`VOLUNTEER`/`ASSIGNED`) | — | ✅ | ✅ |
+| Huỷ đăng ký | — | ✅ nếu là `VOLUNTEER` và chưa check-in; `ASSIGNED` không được tự huỷ | ✅ |
+| Xem tiến độ đủ/chưa đủ số lượng tối thiểu | — | ✅ (lớp mình) | ✅ |
+| Thêm/chỉ định người tham gia sự kiện | — | ❌ → 403 | ✅ (lớp mình) |
 | Xem danh sách người đăng ký | — | ❌ → 403 | ✅ (lớp mình) |
 | Check-in (điểm danh) | — | ❌ → 403 | ✅ (lớp mình) |
 | Gửi ảnh minh chứng điểm danh | — | ✅ (sự kiện đã đăng ký) | ✅ |
@@ -78,8 +81,9 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
                    │  Sự kiện — Sinh viên:                │
                    │  • Xem danh sách sự kiện            │
                    │  • Đăng ký tham gia                 │
-                   │  • Huỷ đăng ký                      │
+                   │  • Huỷ đăng ký nếu là VOLUNTEER     │
                    │  • Xem sự kiện đã đăng ký           │
+                   │  • Thấy trạng thái BCS thêm         │
                    │  • Gửi ảnh minh chứng điểm danh     │
                    │  • Gửi lại ảnh nếu bị từ chối       │
                    │                                      │
@@ -93,6 +97,8 @@ ClassHub có **3 actor chính**. Role được gán theo từng lớp (qua bản
                    │                                      │
                    │  Sự kiện — Quản lý:                  │
                    │  • Tạo sự kiện                      │
+                   │  • Xem tiến độ tối thiểu            │
+                   │  • Thêm/chỉ định người tham gia     │
                    │  • Xem danh sách người đăng ký      │
                    │  • Check-in thủ công                │
                    │  • Xem ảnh minh chứng               │
@@ -127,6 +133,8 @@ graph TB
     UC14[Check-in thủ công]
     UC15[Gửi ảnh minh chứng]
     UC16[Duyệt / Từ chối ảnh]
+    UC17[Chỉ định người tham gia]
+    UC18[Xem tiến độ tối thiểu]
 
     G --> UC1
     G --> UC2
@@ -139,6 +147,7 @@ graph TB
     M --> UC8
     M --> UC9
     M --> UC15
+    M --> UC18
 
     A --> UC10
     A --> UC11
@@ -146,6 +155,8 @@ graph TB
     A --> UC13
     A --> UC14
     A --> UC16
+    A --> UC17
+    A --> UC18
 
     A -.kế thừa.-> M
 ```
@@ -243,10 +254,10 @@ graph TB
 **Actor:** Admin
 **Luồng chính:**
 1. Mở tab Sự kiện → FAB "Tạo sự kiện".
-2. Nhập tiêu đề, mô tả, địa điểm, chọn ngày giờ.
-3. FE gọi `POST /api/events` với `eventTime` ISO không có "Z".
+2. Nhập tiêu đề, mô tả, địa điểm, chọn ngày giờ và có thể nhập `minParticipants`.
+3. FE gọi `POST /api/events` với `eventTime` ISO không có "Z" và `minParticipants` nếu có.
 4. BE `requireAdmin`.
-5. BE tạo `Event`, lưu DB.
+5. BE validate `minParticipants >= 0` nếu khác null, tạo `Event`, lưu DB.
 6. FE quay về tab, reload list.
 
 ---
@@ -259,9 +270,36 @@ graph TB
 2. FE gọi `POST /api/events/{eventId}/volunteer`.
 3. BE load event, `requireMember(userId, event.classroomId)`.
 4. BE check `existsByEventIdAndUserId` → nếu đã đăng ký, throw "Đã đăng ký rồi".
-5. BE tạo `EventParticipant(event, user, checkedIn=false)`.
+5. BE tạo `EventParticipant(event, user, checkedIn=false, source=VOLUNTEER)`.
 6. Unique constraint DB đảm bảo không lưu trùng dù có race condition.
 7. FE reload → chip "Đã đăng ký" hiển thị.
+
+---
+
+### UC17 — Admin thêm/chỉ định người tham gia sự kiện
+
+**Actor:** Admin của lớp
+**Mô tả:** Khi số người tự đăng ký chưa đạt `minParticipants`, Admin mở chi tiết sự kiện và thêm thành viên lớp vào danh sách tham gia.
+
+**Luồng chính:**
+1. Admin tạo sự kiện có `minParticipants`.
+2. Member tự đăng ký trước qua UC8, được lưu với `source=VOLUNTEER`.
+3. Admin mở chi tiết sự kiện, FE gọi `GET /api/events/detail/{eventId}` để xem "Đã tham gia X/Y, còn thiếu N".
+4. Nếu chưa đủ người, FE lấy danh sách thành viên bằng `GET /api/classrooms/{classroomId}/members`.
+5. Admin chọn một hoặc nhiều thành viên, FE gọi `POST /api/events/{eventId}/participants/assign` với `userIds`.
+6. BE `requireAdmin`, distinct `userIds`, validate từng user tồn tại và thuộc lớp của event.
+7. BE bỏ qua user đã là participant; nếu user đã tự đăng ký `VOLUNTEER` thì không đổi sang `ASSIGNED`.
+8. Với user hợp lệ chưa tham gia, BE tạo `EventParticipant(source=ASSIGNED, assignedBy=admin, assignedAt=now)`.
+9. FE reload detail/list participant; member được thêm không cần đăng ký lại.
+
+**Luồng phụ:**
+- User không thuộc lớp hoặc không tồn tại → 400.
+- Người gọi không phải Admin lớp → 403.
+- Request `userIds` rỗng → 400.
+
+**Hậu điều kiện:**
+- Participant `ASSIGNED` không được tự huỷ tham gia.
+- Audit lưu Admin nào đã thêm và thời điểm thêm.
 
 ---
 
@@ -333,5 +371,5 @@ graph TB
 ## 3.6. Tổng kết
 
 - **3 actor** với phạm vi quyền tách biệt rõ ràng.
-- **26 use case** chính chia 4 nhóm: Tài khoản, Lớp, Quỹ, Sự kiện (trong đó 3 UC mới cho Camera Check-in).
+- **28 use case** chính chia 4 nhóm: Tài khoản, Lớp, Quỹ, Sự kiện (trong đó có Camera Check-in, xem tiến độ tối thiểu và Admin chỉ định participant cho sự kiện).
 - Mọi use case yêu cầu quyền đều có kiểm tra **theo lớp** (không chỉ kiểm tra role toàn cục).

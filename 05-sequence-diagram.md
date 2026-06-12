@@ -214,7 +214,7 @@ sequenceDiagram
     ES->>EPR: existsByEventIdAndUserId(eventId, userId)
     EPR-->>ES: false
 
-    ES->>EPR: save(new EventParticipant{event, user, checkedIn=false})
+    ES->>EPR: save(new EventParticipant{event, user, checkedIn=false, source=VOLUNTEER})
     EPR->>DB: INSERT INTO event_participants
     Note over DB: UNIQUE(event_id, user_id) đảm bảo không trùng
 
@@ -224,7 +224,103 @@ sequenceDiagram
     F->>M: Chip "Đã đăng ký" hiển thị
 ```
 
-## 5.6. Admin check-in sự kiện (B4: lưu checkedBy)
+## 5.6. Admin bổ sung người tham gia khi chưa đủ tối thiểu
+
+```mermaid
+sequenceDiagram
+    actor A as Admin
+    actor M as Member
+    participant F as Flutter
+    participant EC as EventController
+    participant CC as ClassroomController
+    participant ES as EventService
+    participant AS as AuthorizationService
+    participant ER as EventRepo
+    participant CMR as ClassMemberRepo
+    participant EPR as EventParticipantRepo
+    participant UR as UserRepo
+    participant DB as MySQL
+
+    A->>F: Tạo sự kiện, nhập minParticipants
+    F->>EC: POST /api/events {classroomId, title, eventTime, minParticipants}
+    EC->>ES: createEvent(request, adminId)
+    ES->>AS: requireAdmin(adminId, classroomId)
+    ES->>ER: save(Event{minParticipants})
+    ER->>DB: INSERT INTO events
+
+    M->>F: Tự đăng ký tham gia
+    F->>EC: POST /api/events/{eventId}/volunteer
+    EC->>ES: volunteer(eventId, memberId)
+    ES->>EPR: save(EventParticipant{source=VOLUNTEER})
+    EPR->>DB: INSERT INTO event_participants
+
+    A->>F: Mở chi tiết sự kiện
+    F->>EC: GET /api/events/detail/{eventId}
+    EC->>ES: getEventDetail(eventId, currentUserId)
+    ES->>AS: requireMember(currentUserId, event.classroom.id)
+    ES->>EPR: countByEventId(eventId)
+    ES-->>EC: EventResponse{minParticipants, volunteerCount}
+    EC-->>F: 200 OK
+    F->>A: Hiển thị "Đã tham gia X/Y, còn thiếu N"
+
+    alt chưa đủ người
+        F->>CC: GET /api/classrooms/{classroomId}/members
+        CC-->>F: Danh sách thành viên lớp
+        A->>F: Chọn member cần thêm
+        F->>EC: POST /api/events/{eventId}/participants/assign {userIds}
+        EC->>ES: assignParticipants(eventId, userIds, adminId)
+        ES->>AS: requireAdmin(adminId, event.classroom.id)
+        ES->>ES: distinct(userIds)
+        ES->>UR: findAllById(userIds)
+        ES->>CMR: validate users thuộc lớp event
+        ES->>EPR: find existing participants
+        loop từng user hợp lệ chưa tham gia
+            ES->>EPR: save(EventParticipant{source=ASSIGNED, assignedBy=admin, assignedAt=now})
+            EPR->>DB: INSERT INTO event_participants
+        end
+        Note over ES,EPR: User đã tham gia thì skip; VOLUNTEER không đổi thành ASSIGNED
+        ES-->>EC: List<EventParticipantResponse>
+        EC-->>F: 200 OK
+        F->>A: Reload detail/participants
+    end
+```
+
+## 5.7. Sinh viên huỷ tham gia sự kiện
+
+```mermaid
+sequenceDiagram
+    actor M as Member
+    participant F as Flutter
+    participant EC as EventController
+    participant ES as EventService
+    participant AS as AuthorizationService
+    participant EPR as EventParticipantRepo
+    participant DB as MySQL
+
+    M->>F: Bấm "Huỷ tham gia"
+    F->>EC: DELETE /api/events/{eventId}/volunteer (Bearer)
+    EC->>ES: cancelVolunteer(eventId, userId)
+    ES->>AS: requireMember(userId, event.classroom.id)
+    ES->>EPR: findByEventIdAndUserId(eventId, userId)
+    EPR-->>ES: participant
+
+    alt participant.source == ASSIGNED
+        ES-->>EC: BadRequestException("Người được BCS thêm không thể tự huỷ")
+        EC-->>F: 400
+    else participant.source == VOLUNTEER or null fallback VOLUNTEER
+        alt participant.checkedIn == true
+            ES-->>EC: BadRequestException("Không thể hủy đăng ký sau khi đã check-in")
+            EC-->>F: 400
+        else chưa check-in
+            ES->>EPR: delete(participant)
+            EPR->>DB: DELETE FROM event_participants
+            EC-->>F: 204 No Content
+            F->>M: Chip quay về "Đăng ký"
+        end
+    end
+```
+
+## 5.8. Admin check-in sự kiện (B4: lưu checkedBy)
 
 ```mermaid
 sequenceDiagram
@@ -274,7 +370,7 @@ sequenceDiagram
     end
 ```
 
-## 5.7. Camera Check-in: Member gửi ảnh minh chứng
+## 5.9. Camera Check-in: Member gửi ảnh minh chứng
 
 ```mermaid
 sequenceDiagram
@@ -327,7 +423,7 @@ sequenceDiagram
     end
 ```
 
-## 5.8. Camera Check-in: Admin duyệt / từ chối ảnh
+## 5.10. Camera Check-in: Admin duyệt / từ chối ảnh
 
 ```mermaid
 sequenceDiagram
@@ -375,7 +471,7 @@ sequenceDiagram
     end
 ```
 
-## 5.9. Tổng kết
+## 5.11. Tổng kết
 
 | Sequence | Tính nghiệp vụ chính được thể hiện |
 |---|---|
@@ -383,10 +479,12 @@ sequenceDiagram
 | 5.2 Tạo khoản thu | Auto-sinh payment cho all members; requireAdmin |
 | 5.3 Xác nhận thanh toán | Idempotency check; lưu confirmedBy |
 | 5.4 QR + polling | Owner-only check; 5s polling; dispose timer |
-| 5.5 Volunteer | requireMember; chống đăng ký trùng |
-| 5.6 Check-in thủ công | requireAdmin; idempotency; lưu checkedBy |
-| 5.7 Camera Check-in (gửi ảnh) | Multipart upload; validate contentType; FileStorageService; chống submit trùng |
-| 5.8 Duyệt/Từ chối ảnh | requireAdmin; approve → set checkedIn; reject → lưu lý do; Member gửi lại được |
+| 5.5 Volunteer | requireMember; chống đăng ký trùng; lưu `source=VOLUNTEER` |
+| 5.6 Assign participant | Admin xem tiến độ tối thiểu; validate member thuộc lớp; skip participant đã tồn tại; lưu `source=ASSIGNED` + audit |
+| 5.7 Huỷ tham gia | Chặn `ASSIGNED`; `VOLUNTEER` chỉ huỷ được khi chưa check-in; dữ liệu cũ NULL fallback `VOLUNTEER` |
+| 5.8 Check-in thủ công | requireAdmin; idempotency; lưu checkedBy |
+| 5.9 Camera Check-in (gửi ảnh) | Multipart upload; validate contentType; FileStorageService; chống submit trùng |
+| 5.10 Duyệt/Từ chối ảnh | requireAdmin; approve → set checkedIn; reject → lưu lý do; Member gửi lại được |
 
 **Điểm chung của mọi sequence:**
 - Mọi request (trừ /auth) đều đi qua `JwtAuthenticationFilter`.

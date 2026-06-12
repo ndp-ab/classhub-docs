@@ -2,7 +2,7 @@
 
 ## 4.1. Tổng quan
 
-ClassHub sử dụng **MySQL 8** với **12 bảng**. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
+ClassHub sử dụng **MySQL 8** với **13 bảng**. Mapping qua **JPA/Hibernate** (Spring Data JPA). Khi BE khởi động, `spring.jpa.hibernate.ddl-auto=update` tự sinh/cập nhật schema từ entity Java.
 
 Database: `classhub_db` (charset `utf8mb4`).
 
@@ -16,12 +16,13 @@ Database: `classhub_db` (charset `utf8mb4`).
 | 4 | `fund_collections` | Đợt thu quỹ | 7 |
 | 5 | `fund_payments` | Trạng thái đóng tiền của từng SV trong đợt thu | 8 |
 | 6 | `fund_expenses` | Khoản chi | 7 |
-| 7 | `events` | Sự kiện lớp | 8 |
-| 8 | `event_participants` | Sinh viên đăng ký + check-in sự kiện | 7 |
-| 9 | `classroom_bank_accounts` | Tài khoản ngân hàng nhận tiền theo lớp | 10 |
-| 10 | `event_checkin_submissions` | Ảnh minh chứng điểm danh sự kiện | 13 |
-| 11 | `notifications` | Thông báo in-app (tiêu đề, nội dung, loại, đối tượng liên quan) | 8 |
-| 12 | `notification_recipients` | Quan hệ thông báo ↔ người nhận + trạng thái đã đọc | 5 |
+| 7 | `events` | Sự kiện lớp | 9 |
+| 8 | `event_participants` | Sinh viên đăng ký/chỉ định + check-in sự kiện | 10 |
+| 9 | `banks` | Danh mục ngân hàng đồng bộ từ VietQR | 12 |
+| 10 | `classroom_bank_accounts` | Tài khoản ngân hàng nhận tiền theo lớp | 11 |
+| 11 | `event_checkin_submissions` | Ảnh minh chứng điểm danh sự kiện | 13 |
+| 12 | `notifications` | Thông báo in-app (tiêu đề, nội dung, loại, đối tượng liên quan) | 9 |
+| 13 | `notification_recipients` | Quan hệ thông báo ↔ người nhận + trạng thái đã đọc | 6 |
 
 ## 4.3. Sơ đồ ERD (Mermaid)
 
@@ -35,6 +36,7 @@ erDiagram
     USERS ||--o{ EVENTS : "tạo (admin)"
     USERS ||--o{ EVENT_PARTICIPANTS : "đăng ký"
     USERS ||--o{ EVENT_PARTICIPANTS : "check-in (admin)"
+    USERS ||--o{ EVENT_PARTICIPANTS : "chỉ định (assigned_by)"
     USERS ||--o{ CLASSROOM_BANK_ACCOUNTS : "cấu hình"
     USERS ||--o{ NOTIFICATIONS : "tạo"
     USERS ||--o{ NOTIFICATION_RECIPIENTS : "nhận"
@@ -53,6 +55,21 @@ erDiagram
     USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "gửi ảnh (user)"
     USERS ||--o{ EVENT_CHECKIN_SUBMISSIONS : "duyệt (reviewed_by)"
     NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : "gửi đến"
+
+    BANKS {
+        bigint id PK
+        int vietqr_id
+        varchar(6) bin UK
+        varchar code
+        varchar name
+        varchar short_name
+        varchar logo
+        boolean transfer_supported
+        boolean lookup_supported
+        boolean active
+        datetime created_at
+        datetime updated_at
+    }
 
     USERS {
         bigint id PK
@@ -118,6 +135,7 @@ erDiagram
         text description
         varchar location
         datetime event_time
+        int min_participants
         bigint classroom_id FK
         bigint created_by FK
         datetime created_at
@@ -130,6 +148,9 @@ erDiagram
         boolean checked_in
         datetime checked_in_at
         bigint checked_by FK
+        enum source "VOLUNTEER|ASSIGNED"
+        bigint assigned_by FK
+        datetime assigned_at
         datetime registered_at
     }
 
@@ -138,6 +159,7 @@ erDiagram
         bigint classroom_id FK
         varchar bank_bin
         varchar bank_name
+        varchar short_name
         varchar account_no
         varchar account_name
         boolean active
@@ -166,10 +188,10 @@ erDiagram
     NOTIFICATIONS {
         bigint id PK
         bigint classroom_id FK
-        enum type "COLLECTION_CREATED|EVENT_CREATED|..."
+        enum type "COLLECTION_CREATED|PAYMENT_CONFIRMED|EVENT_CREATED|CHECKIN_SUBMITTED|CHECKIN_APPROVED|CHECKIN_REJECTED"
         varchar title
         text message
-        enum target_type "FUND_COLLECTION|EVENT|..."
+        enum target_type "CLASSROOM|FUND_COLLECTION|FUND_PAYMENT|EVENT|CHECKIN_SUBMISSION"
         bigint target_id
         bigint created_by FK
         datetime created_at
@@ -297,13 +319,14 @@ UNIQUE KEY (user_id, classroom_id)
 | `description` | TEXT | NULL | |
 | `location` | VARCHAR(255) | NULL | |
 | `event_time` | DATETIME | NOT NULL | Thời gian bắt đầu |
+| `min_participants` | INT | NULL | Chỉ tiêu số người tối thiểu cần tham gia; không phải sức chứa tối đa |
 | `classroom_id` | BIGINT | FK, NOT NULL | |
 | `created_by` | BIGINT | FK → users.id, NOT NULL | |
 | `created_at` | DATETIME | NOT NULL | |
 
 **Note:** Chưa có `end_time` — đưa vào hướng phát triển.
 
-### 4.4.8. `event_participants` — Đăng ký + check-in
+### 4.4.8. `event_participants` — Đăng ký/chỉ định + check-in
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 |---|---|---|---|
@@ -313,7 +336,10 @@ UNIQUE KEY (user_id, classroom_id)
 | `checked_in` | BOOLEAN | NOT NULL DEFAULT FALSE | |
 | `checked_in_at` | DATETIME | NULL | Thời điểm check-in |
 | `checked_by` | BIGINT | FK → users.id, NULL | **Audit B4:** admin nào check-in |
-| `registered_at` | DATETIME | NOT NULL | Khi sinh viên bấm đăng ký |
+| `source` | ENUM | NULL | `VOLUNTEER` nếu tự đăng ký, `ASSIGNED` nếu BCS thêm; dữ liệu cũ NULL fallback thành `VOLUNTEER` |
+| `assigned_by` | BIGINT | FK → users.id, NULL | Admin/BCS đã thêm participant vào sự kiện |
+| `assigned_at` | DATETIME | NULL | Thời điểm participant được thêm/chỉ định |
+| `registered_at` | DATETIME | NOT NULL | Thời điểm tạo participant; `VOLUNTEER` là lúc sinh viên bấm đăng ký, `ASSIGNED` là lúc Admin thêm |
 
 **Ràng buộc:**
 ```sql
@@ -328,7 +354,8 @@ UNIQUE KEY (event_id, user_id)
 | `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
 | `classroom_id` | BIGINT | FK → classrooms.id, NOT NULL | Lớp sở hữu tài khoản |
 | `bank_bin` | VARCHAR(6) | NOT NULL | Mã ngân hàng VietQR (VD: 970422=MB, 970436=VCB) |
-| `bank_name` | VARCHAR(100) | NOT NULL | Tên ngân hàng hiển thị cho user |
+| `bank_name` | VARCHAR(100) | NOT NULL | Snapshot tên ngân hàng từ bảng `banks` |
+| `short_name` | VARCHAR(100) | NULL | Snapshot tên ngắn từ bảng `banks`, ví dụ `MB` |
 | `account_no` | VARCHAR(20) | NOT NULL | Số tài khoản nhận tiền |
 | `account_name` | VARCHAR(100) | NOT NULL | Tên chủ tài khoản |
 | `active` | BOOLEAN | NOT NULL DEFAULT TRUE | Chỉ 1 tài khoản active=true / 1 classroom |
@@ -341,8 +368,31 @@ UNIQUE KEY (event_id, user_id)
 - **Mỗi lớp có tài khoản riêng** thay vì dùng tài khoản cố định toàn hệ thống.
 - **Giữ lịch sử**: Khi admin đổi tài khoản, hệ thống không xóa bản cũ mà chuyển `active=false` và tạo bản mới `active=true`.
 - **QR động**: API sinh QR luôn lấy tài khoản có `active=true` của lớp đó.
-- `bank_bin` dùng để build URL VietQR.
+- `bank_bin` dùng để build URL VietQR và tham chiếu logic đến `banks.bin`.
+- `bank_name`/`short_name` là snapshot tại thời điểm Admin cấu hình tài khoản; FE chỉ gửi `bankBin`, BE validate qua `banks` và tự copy tên ngân hàng.
 - `created_by` để audit ai đã cấu hình/thay đổi tài khoản (yêu cầu truy vết).
+
+### 4.4.10. `banks` — Danh mục ngân hàng VietQR
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | BIGINT | PK, AUTO_INCREMENT | Khoá chính |
+| `vietqr_id` | INT | NULL | ID ngân hàng từ VietQR API |
+| `bin` | VARCHAR(6) | NOT NULL, UNIQUE | Bank BIN do VietQR trả về; API response expose dưới tên `bankBin` |
+| `code` | VARCHAR(20) | NULL | Mã ngân hàng, ví dụ `MB`, `VCB` |
+| `name` | VARCHAR(255) | NOT NULL | Tên đầy đủ ngân hàng |
+| `short_name` | VARCHAR(100) | NULL | Tên ngắn hiển thị nhanh |
+| `logo` | VARCHAR(1000) | NULL | URL logo từ VietQR |
+| `transfer_supported` | BOOLEAN | NOT NULL | VietQR đánh dấu hỗ trợ chuyển tiền |
+| `lookup_supported` | BOOLEAN | NOT NULL | VietQR đánh dấu hỗ trợ tra cứu |
+| `active` | BOOLEAN | NOT NULL | Chỉ bank active mới trả qua `GET /api/banks` |
+| `created_at` | DATETIME | NOT NULL, auto | Thời điểm tạo bản ghi |
+| `updated_at` | DATETIME | NULL, auto update | Thời điểm cập nhật lần cuối |
+
+**Lý do thiết kế:**
+- `banks` là cache danh mục ngân hàng chuẩn từ VietQR (`vietqr.banks-url=https://api.vietqr.io/v2/banks`), giúp FE không hard-code danh sách ngân hàng.
+- `ClassroomBankAccountService` validate `bankBin` bằng `BankRepository.findByBin(...)` và chỉ chấp nhận bank `active=true`.
+- `classroom_bank_accounts.bank_bin` tham chiếu logic đến `banks.bin`; code hiện tại không khai báo FK DB thật giữa hai bảng này.
 
 ## 4.5. Quan hệ giữa các bảng (giải thích)
 
@@ -358,12 +408,14 @@ UNIQUE KEY (event_id, user_id)
 | Event 1 — n EventParticipant | 1-n | | Một sự kiện có nhiều người đăng ký |
 | User 1 — n EventParticipant | 1-n | | Một sinh viên đăng ký nhiều sự kiện |
 | User 1 — n EventParticipant (checkedBy) | 1-n | | Audit ai check-in |
+| User 1 — n EventParticipant (assignedBy) | 1-n | | Audit admin/BCS nào thêm participant |
 | Event 1 — n EventCheckinSubmission | 1-n | | Một sự kiện có nhiều lượt gửi ảnh |
 | User 1 — n EventCheckinSubmission (user) | 1-n | | Member gửi ảnh |
 | EventParticipant 1 — n EventCheckinSubmission | 1-n | | Theo dõi lịch sử submit của 1 participant |
 | User 1 — n EventCheckinSubmission (reviewedBy) | 1-n | | Admin duyệt/từ chối |
 | Classroom 1 — n ClassroomBankAccount | 1-n | | Một lớp có nhiều tài khoản qua lịch sử (chỉ 1 active tại 1 thời điểm) |
 | User 1 — n ClassroomBankAccount (createdBy) | 1-n | | Admin cấu hình tài khoản |
+| Bank ↔ ClassroomBankAccount | logical | `classroom_bank_accounts.bank_bin` ↔ `banks.bin` | Không có FK DB thật; BE validate `bankBin` qua `BankRepository` rồi snapshot `bankName`/`shortName` |
 | Classroom 1 — n Notification | 1-n | | Một lớp có nhiều thông báo in-app liên quan đến nghiệp vụ của lớp |
 | User 1 — n Notification (createdBy) | 1-n | | User/admin tạo hành động nghiệp vụ sinh thông báo |
 | Notification 1 — n NotificationRecipient | 1-n | | Một thông báo gốc được fan-out đến nhiều người nhận |
@@ -377,15 +429,18 @@ UNIQUE KEY (event_id, user_id)
 | Lưu tiền kiểu gì? | `BigDecimal` (DECIMAL) | Chính xác tuyệt đối, không có lỗi làm tròn |
 | Mã mời sinh ra sao? | 6 ký tự uppercase từ UUID | Đủ chống đoán, đủ ngắn để gõ tay |
 | Auto-sinh payment khi nào? | (1) Khi tạo collection (sinh cho all members), (2) Khi member join lớp (sinh cho all existing collections) | Đảm bảo không bỏ sót member nào |
-| Audit trail | Lưu `confirmed_by` + `paid_at` ở payment; `checked_by` + `checked_in_at` ở participant | Hội đồng hỏi "ai làm" trả lời được |
+| Audit trail | Lưu `confirmed_by` + `paid_at` ở payment; `checked_by` + `checked_in_at`, `assigned_by` + `assigned_at` ở participant | Hội đồng hỏi "ai làm" trả lời được |
 | Chống đăng ký trùng | `UNIQUE(event_id, user_id)` + check ở service | 2 lớp bảo vệ: app + DB |
+| Phân loại participant | `event_participants.source` | Phân biệt sinh viên tự đăng ký (`VOLUNTEER`) và người được BCS thêm (`ASSIGNED`) để áp rule hủy tham gia |
+| Chỉ tiêu tối thiểu sự kiện | `events.min_participants` nullable | Lưu mục tiêu tối thiểu cần đạt; không phải capacity tối đa nên không chặn đăng ký vượt số này |
 | Lưu ảnh minh chứng đâu? | File ngoài repo (`classhub.upload-dir`), DB chỉ lưu `image_path` và metadata | Không phình MySQL, dễ backup/di chuyển file riêng |
 | Tại sao không nhét vào `event_participants`? | Tách bảng riêng `event_checkin_submissions` | Giữ lịch sử submit/reject/resubmit; 1 participant có thể có nhiều submission (gửi lại sau khi bị từ chối) |
 | `/uploads/**` có bảo mật không? | Hiện public cho MVP/demo | Hướng phát triển: API download có JWT + phân quyền theo lớp/sự kiện |
 | Timezone | `Asia/Ho_Chi_Minh` trong JDBC URL | Đảm bảo timestamp đúng giờ Việt Nam |
 | Tài khoản ngân hàng | Tách bảng riêng, giữ history bằng active flag | Hỗ trợ mỗi lớp có tài khoản riêng; QR động theo lớp; admin có thể đổi tài khoản mà vẫn truy vết được lịch sử |
+| Danh mục ngân hàng | Bảng `banks` đồng bộ từ VietQR, không hard-code ở FE | FE chọn bank từ API; BE không tin `bankName` client gửi, chỉ nhận `bankBin` và tự snapshot tên bank |
 | Trạng thái đọc notification | Lưu ở `notification_recipients`, không lưu ở `notifications` | Mỗi user đọc thông báo ở thời điểm khác nhau; cùng một nội dung notification có thể gửi cho nhiều người |
-| Điều hướng notification | `target_type` + `target_id` là FK ngầm | MVP hiện dùng để lưu đối tượng liên quan; sau này FE có thể dùng để deep-link đến sự kiện/khoản thu |
+| Điều hướng notification | `target_type` + `target_id` là FK ngầm | Hiện dùng để lưu đối tượng liên quan; FE chưa deep-link chi tiết, sau này có thể map sang đúng tab/bản ghi |
 
 ## 4.7. Script tạo DB (rút gọn)
 
@@ -426,9 +481,9 @@ Schema còn lại do **Hibernate `ddl-auto=update`** tự sinh khi khởi độn
 | `type` | ENUM | NOT NULL | `COLLECTION_CREATED`, `PAYMENT_CONFIRMED`, `EVENT_CREATED`, `CHECKIN_SUBMITTED`, `CHECKIN_APPROVED`, `CHECKIN_REJECTED` |
 | `title` | VARCHAR(255) | NOT NULL | Tiêu đề ngắn, vd "Có khoản thu mới" |
 | `message` | TEXT | NOT NULL | Nội dung đầy đủ |
-| `target_type` | ENUM | NULL | Loại đối tượng liên quan: `FUND_COLLECTION`, `EVENT`, ... |
+| `target_type` | ENUM | NULL | Loại đối tượng liên quan: `CLASSROOM`, `FUND_COLLECTION`, `FUND_PAYMENT`, `EVENT`, `CHECKIN_SUBMISSION` |
 | `target_id` | BIGINT | NULL | ID đối tượng liên quan (FK ngầm) |
-| `created_by` | BIGINT | FK → users.id, NULL | Admin tạo thông báo |
+| `created_by` | BIGINT | FK → users.id, NULL | User tạo hành động nghiệp vụ sinh thông báo |
 | `created_at` | DATETIME | NOT NULL, auto | Thời điểm tạo |
 
 ### `notification_recipients` — Người nhận thông báo
@@ -450,15 +505,15 @@ UNIQUE KEY (notification_id, user_id)
 
 **Lý do thiết kế:**
 - Tách bảng `notifications` (nội dung) và `notification_recipients` (ai nhận, đã đọc chưa) → 1 thông báo gửi được cho nhiều người mà không trùng lập dữ liệu.
-- `target_id` là FK ngầm (không có constraint DB) → linh hoạt cho nhiều `targetType` khác nhau mà không cần join table phức tạp.
-- `REQUIRES_NEW` trong `NotificationService.createNotification()` tách transaction ghi notification khỏi transaction nghiệp vụ gọi nó. MVP hiện vẫn gọi đồng bộ, chưa có queue/retry riêng.
+- `target_type` + `target_id` là FK ngầm (không có constraint DB) → linh hoạt cho nhiều loại đối tượng khác nhau mà không cần join table phức tạp. FE hiện chủ yếu dùng inbox/mark read, chưa mở sâu đúng tab/bản ghi theo cặp metadata này.
+- `REQUIRES_NEW` trong `NotificationService.createNotification()` tách transaction ghi notification khỏi transaction nghiệp vụ gọi nó. Hiện vẫn gọi đồng bộ, chưa có queue/retry riêng.
 
 ## 4.10. Tổng kết
 
-- **12 bảng** đầy đủ cho 3 phân hệ + tài khoản ngân hàng động + ảnh minh chứng check-in + thông báo in-app.
+- **13 bảng** đầy đủ cho 3 phân hệ + danh mục ngân hàng VietQR + tài khoản ngân hàng động + ảnh minh chứng check-in + thông báo in-app.
 - Quan hệ n-n giữa User và Classroom giải quyết qua bảng `class_members` — đây là điểm "đúng OOAD" nhất của thiết kế.
-- Audit trail (`confirmed_by`, `checked_by`, `created_by` ở bank account, `reviewed_by` ở submission) đảm bảo truy vết được mọi hành động.
+- Audit trail (`confirmed_by`, `checked_by`, `assigned_by`, `created_by` ở bank account, `reviewed_by` ở submission) đảm bảo truy vết được mọi hành động.
 - Sử dụng các kiểu dữ liệu phù hợp: BigDecimal cho tiền, LocalDate cho hạn, LocalDateTime cho timestamp.
-- **Tài khoản ngân hàng theo lớp** giải quyết bài toán mỗi lớp có quỹ riêng, QR thanh toán động, và giữ lịch sử thay đổi.
+- **Tài khoản ngân hàng theo lớp** giải quyết bài toán mỗi lớp có quỹ riêng, QR thanh toán động, và giữ lịch sử thay đổi. Danh mục ngân hàng lấy từ `banks`, FE không còn hard-code danh sách ngân hàng.
 - **Ảnh minh chứng** lưu ngoài DB (file system), DB chỉ lưu path + metadata — tránh phình MySQL và dễ scale storage.
-- **Thông báo in-app** thiết kế fan-out: 1 notification → N recipient records. FE polling `unread-count` khi vào HomeScreen, hiển thị badge số chưa đọc trên icon chuông.
+- **Thông báo in-app** thiết kế fan-out: 1 notification → N recipient records. FE polling `unread-count` toàn cục ở HomeScreen và theo `classroomId` trong ClassroomDetailScreen, hiển thị badge số chưa đọc trên icon chuông.

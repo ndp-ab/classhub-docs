@@ -39,7 +39,7 @@
 2. Sang tab "Khoản thu".
 3. Đầu tab có card "Tài khoản nhận tiền" hiển thị "Chưa cấu hình".
 4. Bấm "Thiết lập tài khoản nhận tiền" → mở màn cấu hình.
-5. Bấm trường "Ngân hàng" → bottom sheet mở với search bar + danh sách 20 ngân hàng VN.
+5. Bấm trường "Ngân hàng" → bottom sheet mở với search bar + danh sách ngân hàng load từ backend (`GET /api/banks`, dữ liệu đã sync từ VietQR).
 6. Gõ "MB" trong search → danh sách lọc chỉ còn "Ngân hàng TMCP Quân đội (MB Bank)".
 7. Chọn MB Bank → bottom sheet đóng, trường "Ngân hàng" hiển thị **"MB Bank"**.
 8. Nhập:
@@ -115,6 +115,8 @@
 
 ### Bước 9 — Demo phân hệ Sự kiện + **Camera Check-in** (2.5 phút)
 
+> Phần dưới là luồng FE hiện có. Nghiệp vụ Event mới (`minParticipants`, detail event, assign participants) đã sẵn sàng ở backend nhưng chưa có `EventDetailScreen`/`AssignParticipantsSheet`, nên chưa nhận là đã demo được trên app.
+
 **Trên laptop (Admin):**
 1. Sang tab "Sự kiện" → FAB "Tạo sự kiện".
 2. Tạo "Họp lớp cuối kỳ", location = "P.A201", chọn ngày giờ.
@@ -136,6 +138,14 @@
 > Nói: "Tương tự xác nhận thanh toán, **lưu ai duyệt và lúc nào** — audit trail. Và nếu ảnh không đúng — Admin từ chối kèm lý do, Member gửi lại được."
 
 11. Counter "Check-in: 1/1" cập nhật.
+
+**Kịch bản demo sau khi FE tích hợp Event detail/assign:**
+1. Admin tạo sự kiện có số người tối thiểu cần tham gia, ví dụ `minParticipants = 3`.
+2. Member tự đăng ký, participant có trạng thái `VOLUNTEER`.
+3. Admin tap card sự kiện để mở chi tiết, thấy "Đã tham gia 1/3, còn thiếu 2".
+4. Admin mở `AssignParticipantsSheet`, chọn thêm thành viên lớp.
+5. App gọi `POST /api/events/{eventId}/participants/assign`; người được thêm hiển thị trạng thái "BCS thêm" hoặc "Được BCS thêm vào danh sách".
+6. Member được BCS thêm không cần đăng ký lại và không được tự huỷ tham gia.
 
 ### Bước 10 — Demo bảo mật (2 phút) — **Quan trọng nhất**
 
@@ -202,8 +212,8 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 | "QR có tự động không?" | "QR sinh URL VietQR, sinh viên CK, admin đối chiếu sao kê + bấm xác nhận. Đây là **bán tự động**. Tự động hoàn toàn cần webhook ngân hàng — hướng phát triển." |
 | "Tài khoản ngân hàng lấy từ đâu?" | "Admin cấu hình cho từng lớp trong tab Quỹ. Lưu vào DB table `classroom_bank_accounts`. Mỗi lớp có tài khoản riêng, QR dùng tài khoản đó. Không dùng tài khoản cố định." |
 | "Nếu đổi tài khoản thì sao?" | "Admin cập nhật lại, hệ thống tạo bản ghi mới `active=true`, bản cũ chuyển `active=false` để giữ lịch sử. QR luôn lấy tài khoản active hiện tại." |
-| "Tại sao không nhập Bank BIN bằng tay?" | "Để tránh nhập sai. Admin chỉ chọn từ danh sách 20 ngân hàng phổ biến VN, hệ thống tự map Bank BIN. User không nhìn thấy BIN trên UI." |
-| "Danh sách ngân hàng lấy từ đâu?" | "Hiện hard-code local 20 ngân hàng VN trong FE (`lib/core/constants/vietnam_banks.dart`). Hướng phát triển: BE thêm API `/api/banks` dynamic + logo." |
+| "Tại sao không nhập Bank BIN bằng tay?" | "Để tránh nhập sai. Admin chọn từ danh mục ngân hàng backend trả về; FE gửi `bankBin`, backend validate trong bảng `banks` và tự snapshot tên ngân hàng." |
+| "Danh sách ngân hàng lấy từ đâu?" | "Backend sync từ VietQR qua `POST /api/banks/sync`, lưu cache trong bảng `banks`; FE gọi `GET /api/banks`, không còn hard-code danh sách ngân hàng." |
 | "Token lưu ở đâu?" | "Server stateless, không lưu. Client lưu SharedPreferences, mỗi request gắn Authorization Bearer." |
 | "Mã mời sinh thế nào?" | "6 ký tự uppercase từ UUID, unique constraint ở DB." |
 | "Thầy có token, có vào được API người khác không?" | "Token có claim userId. Service luôn check `userId == payment.user.id` cho action lấy QR/status. Còn action chỉnh sửa thì check role qua `ClassMember.role`." |
@@ -212,8 +222,8 @@ curl -i -X PUT http://localhost:8080/api/fund/payments/{paymentIdOfClass2}/confi
 | "Camera Check-in hoạt động thế nào?" | "Member chụp ảnh trong app → FE upload multipart/form-data lên BE → BE validate contentType + extension + size → lưu file vào disk, lưu metadata vào DB (bảng `event_checkin_submissions`, status=PENDING). Admin mở danh sách → xem ảnh → Duyệt (set checkedIn=true + audit) hoặc Từ chối (Member gửi lại)." |
 | "Tại sao FE lúc đầu bị lỗi 'File phải là ảnh'?" | "FE không set `contentType` trong `MultipartFile.fromPath` nên BE nhận null/octet-stream. Đã sửa: thêm `contentType: MediaType('image', 'jpeg')` — BE validate pass." |
 | "Ảnh lưu ở đâu?" | "Ngoài repo: `D:/big_dream/classhub-uploads/event-checkins/`. DB chỉ lưu `image_path` và metadata. Không lưu binary/base64 vào MySQL." |
-| "Có test case chưa?" | "Có 40 test case đặc tả ở `10-kiem-thu.md` (trong đó 5 test case Camera Check-in TC-FILE-01 đến TC-FILE-05), đã chạy manual qua Postman. Test tự động JUnit + MockMvc đưa vào giai đoạn tiếp theo." |
-| "Hạn chế hiện tại?" | "(1) Chưa có tab Thành viên — chờ API BE. (2) Chưa có dashboard thống kê quỹ. (3) Hệ thống hiện chỉ triển khai role ADMIN/MEMBER; OWNER chỉ là hướng mở rộng, chưa có trong code hiện tại. (4) Đối soát ngân hàng thủ công. (5) Danh sách ngân hàng hard-code local, chưa có API `/api/banks`. (6) Chưa có UI lịch sử tài khoản. (7) `/uploads/**` hiện public — hướng phát triển: API download có JWT. Tất cả ở mục Hướng phát triển." |
+| "Có test case chưa?" | "Có 74 test case đặc tả ở `10-kiem-thu.md` (bao gồm Bank catalog dynamic, Event assigned participants, Camera Check-in và Notification). Test tự động chi tiết JUnit + MockMvc đưa vào giai đoạn tiếp theo." |
+| "Hạn chế hiện tại?" | "(1) FE chưa có `EventDetailScreen`/`AssignParticipantsSheet` và input `minParticipants`. (2) Chưa có dashboard thống kê quỹ. (3) Hệ thống hiện chỉ triển khai role ADMIN/MEMBER; OWNER là hướng mở rộng. (4) Đối soát ngân hàng thủ công. (5) `POST /api/banks/sync` hiện chỉ JWT-only, production nên restrict hoặc chạy job nội bộ. (6) Chưa có UI lịch sử tài khoản. (7) `/uploads/**` hiện public — hướng phát triển: API download có JWT. Tất cả ở mục Hướng phát triển." |
 
 ## Lỗi có thể gặp khi demo + Cách xử lý
 

@@ -24,7 +24,7 @@ ClassHub là **mobile application** theo mô hình **client-server 3 lớp**:
                 ↓
 ┌──────────────────────────────────────┐
 │         MySQL Database               │  ← Persistence
-│   (8 tables)                         │
+│   (13 tables)                        │
 └──────────────────────────────────────┘
 ```
 
@@ -43,21 +43,27 @@ graph TB
     subgraph "Server Spring Boot 4.0"
         FILTER[JwtAuthenticationFilter<br/>validate Bearer]
         AUTH[AuthController]
+        BC[BankController]
         CR[ClassroomController]
+        CBA[ClassroomBankAccountController]
         FC[FundCollectionController]
         FE[FundExpenseController]
         EC[EventController]
 
         AUTHS[AuthService<br/>BCrypt + JWT]
+        BS[BankService]
         CS[ClassroomService]
+        CBAS[ClassroomBankAccountService]
         FCS[FundCollectionService]
         FES[FundExpenseService]
         ES[EventService]
         AUS[AuthorizationService<br/>requireMember/Admin]
 
         URP[UserRepository]
+        BRP[BankRepository]
         CRP[ClassroomRepository]
         CMRP[ClassMemberRepository]
+        CBARP[ClassroomBankAccountRepository]
         FCRP[FundCollectionRepository]
         FPRP[FundPaymentRepository]
         FERP[FundExpenseRepository]
@@ -66,35 +72,45 @@ graph TB
     end
 
     DB[(MySQL 8<br/>classhub_db)]
-    QR[img.vietqr.io<br/>External]
+    QR[img.vietqr.io<br/>QR image]
+    BANKAPI[api.vietqr.io/v2/banks<br/>Bank catalog API]
 
     UI -->|HTTPS REST| FILTER
     FILTER --> AUTH
+    FILTER --> BC
     FILTER --> CR
+    FILTER --> CBA
     FILTER --> FC
     FILTER --> FE
     FILTER --> EC
 
     AUTH --> AUTHS
+    BC --> BS
     CR --> CS
+    CBA --> CBAS
     FC --> FCS
     FE --> FES
     EC --> ES
 
     CS --> AUS
+    CBAS --> AUS
     FCS --> AUS
     FES --> AUS
     ES --> AUS
 
     AUTHS --> URP
+    BS --> BRP
     CS --> URP & CRP & CMRP & FCRP & FPRP
+    CBAS --> URP & CRP & CBARP & BRP
     FCS --> URP & CRP & CMRP & FCRP & FPRP
     FES --> URP & CRP & FERP
     ES --> URP & CRP & ERP & EPRP
 
     URP --> DB
+    BRP --> DB
     CRP --> DB
     CMRP --> DB
+    CBARP --> DB
     FCRP --> DB
     FPRP --> DB
     FERP --> DB
@@ -102,6 +118,7 @@ graph TB
     EPRP --> DB
 
     UI -.tải ảnh QR.-> QR
+    BS -.sync bank catalog.-> BANKAPI
 ```
 
 ## 6.3. Công nghệ sử dụng
@@ -289,8 +306,8 @@ Vi phạm → `ForbiddenException` → `GlobalExceptionHandler` trả **403 JSON
 
 ## 6.7. External integration
 
-### VietQR (img.vietqr.io)
-- Backend chỉ **sinh URL** chuẩn VietQR, không gọi API trả lời nào.
+### VietQR QR image (img.vietqr.io)
+- Backend chỉ **sinh URL** chuẩn VietQR cho ảnh QR thanh toán, không gọi API ảnh QR từ server.
 - Flutter `Image.network(qrUrl)` tự tải PNG về.
 - URL format:
   ```
@@ -300,6 +317,11 @@ Vi phạm → `ForbiddenException` → `GlobalExceptionHandler` trả **403 JSON
     &accountName={accountName}
   ```
 - Không phụ thuộc network giữa BE và VietQR → BE vẫn chạy được khi VietQR down (chỉ Flutter không tải được ảnh).
+
+### VietQR Bank catalog (api.vietqr.io/v2/banks)
+- `BankService.syncBanksFromVietQr()` gọi `vietqr.banks-url=https://api.vietqr.io/v2/banks`.
+- Dữ liệu được upsert vào bảng `banks` theo `bin`; FE đọc danh sách qua `GET /api/banks`.
+- `POST /api/banks/sync` hiện chỉ yêu cầu JWT hợp lệ, chưa tách quyền admin hệ thống riêng.
 
 ## 6.8. Triển khai (deployment)
 
@@ -346,16 +368,23 @@ classhub-api/
 │   ├── ClasshubApiApplication.java
 │   ├── config/        (JwtUtil, JwtAuthenticationFilter, JwtAuthenticationEntryPoint,
 │   │                   SecurityConfig, SecurityUtil)
-│   ├── controller/    (Auth, Classroom, FundCollection, FundExpense, Event)
-│   ├── service/       (Auth, Classroom, FundCollection, FundExpense, Event,
-│   │                   AuthorizationService)
-│   ├── repository/    (8 repository: User, Classroom, ClassMember,
-│   │                   FundCollection, FundPayment, FundExpense,
-│   │                   Event, EventParticipant)
-│   ├── entity/        (User, Classroom, ClassMember,
-│   │                   FundCollection, FundPayment, FundExpense,
-│   │                   Event, EventParticipant)
-│   ├── dto/           (16 DTO: Request/Response các loại)
+│   ├── controller/    (Auth, Bank, Classroom, ClassroomBankAccount,
+│   │                   Event, EventCheckinSubmission, FundCollection,
+│   │                   FundExpense, Notification)
+│   ├── service/       (Auth, Authorization, Bank, Classroom,
+│   │                   ClassroomBankAccount, Event, EventCheckinSubmission,
+│   │                   FileStorage, FundCollection, FundExpense, Notification)
+│   ├── repository/    (13 repository: User, Bank, Classroom, ClassMember,
+│   │                   ClassroomBankAccount, FundCollection, FundPayment,
+│   │                   FundExpense, Event, EventParticipant,
+│   │                   EventCheckinSubmission, Notification,
+│   │                   NotificationRecipient)
+│   ├── entity/        (13 entity chính: User, Bank, Classroom, ClassMember,
+│   │                   ClassroomBankAccount, FundCollection, FundPayment,
+│   │                   FundExpense, Event, EventParticipant,
+│   │                   EventCheckinSubmission, Notification,
+│   │                   NotificationRecipient; kèm enum)
+│   ├── dto/           (26 DTO: Request/Response các loại)
 │   └── exception/     (BadRequestException, ForbiddenException, GlobalExceptionHandler)
 ├── src/main/resources/application.properties
 ├── pom.xml
@@ -374,12 +403,15 @@ classhub_app/
 │   │   │               AppSectionTitle, AppEmptyState, AppErrorState,
 │   │   │               AppLoading, PaymentStatusBadge)
 │   │   └── utils/     (formatters: formatVnd, formatDate, formatDateTime)
-│   ├── models/        (fund_collection, payment, expense, event)
-│   ├── services/      (auth_service, classroom_service, fund_service, event_service)
+│   ├── models/        (app_notification, bank, class_member,
+│   │                   classroom_bank_account, event, expense,
+│   │                   fund_collection, payment)
+│   ├── services/      (auth_service, classroom_service, event_service,
+│   │                   fund_service, notification_service)
 │   ├── providers/     (auth_provider)
 │   └── screens/
 │       ├── (login, signup, home, create_classroom, join_classroom,
-│       │    classroom_detail)
+│       │    classroom_detail, classroom_bank_account, notification)
 │       ├── fund/      (fund_tab, payment_qr, collection_payments,
 │       │               create_collection, expenses_screen, create_expense)
 │       └── events/    (events_tab, create_event, event_participants)
